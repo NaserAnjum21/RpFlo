@@ -70,3 +70,8 @@ React 19 + Vite + Tailwind CSS v4 + shadcn/ui (base-ui). TanStack Query for data
 - Domain-driven error codes
 - UI should be rich but empathetic — not overbuilt
 - Fetch once, filter client-side when cost is low
+
+## Living Documentation
+
+- **`docs/decisions.md`** — Architecture Decision Log. When making a change that involves an architectural choice, trade-off, or deviation from existing patterns, add a new ADR entry at the top of this file. Use the existing format (ADR number, date, status, context, decision, trade-offs). Update the status of existing entries if a decision is superseded or reversed.
+- **This file (`CLAUDE.md`)** — Keep this file accurate. When adding new projects, layers, patterns, commands, or conventions, update the relevant section here. If a section becomes stale due to a code change, fix it in the same commit.
