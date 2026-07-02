@@ -1,0 +1,21 @@
+# OS
+.DS_Store
+
+# .NET
+bin/
+obj/
+
+# Node
+node_modules/
+
+# Frontend build
+frontend/dist/
+
+# IDE
+.vs/
+*.user
+*.suo
+
+# Environment
+.env
+appsettings.*.local.json
