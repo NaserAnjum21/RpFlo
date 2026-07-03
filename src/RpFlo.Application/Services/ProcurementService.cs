@@ -37,7 +37,7 @@ public sealed class ProcurementService(
         await procurementRepo.AddAsync(procurement, ct);
         await unitOfWork.SaveChangesAsync(ct);
 
-        return MapToResponse(procurement, user);
+        return await MapToResponseAsync(procurement, user, ct);
     }
 
     public async Task<Result<ProcurementResponse>> GetByIdAsync(Guid id, CancellationToken ct = default)
@@ -47,7 +47,7 @@ public sealed class ProcurementService(
             return Error.NotFound("Procurement", $"Procurement request {id} not found.");
 
         var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return MapToResponse(procurement, requester!);
+        return await MapToResponseAsync(procurement, requester!, ct);
     }
 
     public async Task<IReadOnlyList<ProcurementListItem>> GetAllAsync(CancellationToken ct = default)
@@ -113,7 +113,7 @@ public sealed class ProcurementService(
         await unitOfWork.SaveChangesAsync(ct);
 
         var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return MapToResponse(procurement, requester!);
+        return await MapToResponseAsync(procurement, requester!, ct);
     }
 
     public async Task<Result<ProcurementResponse>> AddLineItemsAsync(
@@ -139,7 +139,7 @@ public sealed class ProcurementService(
         await unitOfWork.SaveChangesAsync(ct);
 
         var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return MapToResponse(procurement, requester!);
+        return await MapToResponseAsync(procurement, requester!, ct);
     }
 
     public async Task<Result<ProcurementResponse>> RemoveLineItemAsync(
@@ -163,7 +163,7 @@ public sealed class ProcurementService(
         await unitOfWork.SaveChangesAsync(ct);
 
         var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return MapToResponse(procurement, requester!);
+        return await MapToResponseAsync(procurement, requester!, ct);
     }
 
     public async Task<Result<ProcurementResponse>> SubmitAsync(
@@ -182,7 +182,7 @@ public sealed class ProcurementService(
         await unitOfWork.SaveChangesAsync(ct);
 
         var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return MapToResponse(procurement, requester!);
+        return await MapToResponseAsync(procurement, requester!, ct);
     }
 
     public async Task<Result<ProcurementResponse>> ApproveByManagerAsync(
@@ -207,7 +207,7 @@ public sealed class ProcurementService(
         await unitOfWork.SaveChangesAsync(ct);
 
         var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return MapToResponse(procurement, requester!);
+        return await MapToResponseAsync(procurement, requester!, ct);
     }
 
     public async Task<Result<ProcurementResponse>> RejectByManagerAsync(
@@ -230,7 +230,7 @@ public sealed class ProcurementService(
         await unitOfWork.SaveChangesAsync(ct);
 
         var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return MapToResponse(procurement, requester!);
+        return await MapToResponseAsync(procurement, requester!, ct);
     }
 
     public async Task<Result<ProcurementResponse>> ApproveByFinanceAsync(
@@ -253,7 +253,7 @@ public sealed class ProcurementService(
         await unitOfWork.SaveChangesAsync(ct);
 
         var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return MapToResponse(procurement, requester!);
+        return await MapToResponseAsync(procurement, requester!, ct);
     }
 
     public async Task<Result<ProcurementResponse>> RejectByFinanceAsync(
@@ -276,7 +276,7 @@ public sealed class ProcurementService(
         await unitOfWork.SaveChangesAsync(ct);
 
         var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return MapToResponse(procurement, requester!);
+        return await MapToResponseAsync(procurement, requester!, ct);
     }
 
     public async Task<Result<ProcurementResponse>> IssuePurchaseOrderAsync(
@@ -299,7 +299,7 @@ public sealed class ProcurementService(
         await unitOfWork.SaveChangesAsync(ct);
 
         var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return MapToResponse(procurement, requester!);
+        return await MapToResponseAsync(procurement, requester!, ct);
     }
 
     public async Task<Result<ProcurementResponse>> ReviseToDraftAsync(
@@ -316,7 +316,7 @@ public sealed class ProcurementService(
         await unitOfWork.SaveChangesAsync(ct);
 
         var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return MapToResponse(procurement, requester!);
+        return await MapToResponseAsync(procurement, requester!, ct);
     }
 
     public async Task<Result<CommentResponse>> AddCommentAsync(
@@ -377,13 +377,20 @@ public sealed class ProcurementService(
             DepartmentBreakdown: departmentGroups);
     }
 
-    private static ProcurementResponse MapToResponse(ProcurementRequest p, User requester)
+    private async Task<ProcurementResponse> MapToResponseAsync(ProcurementRequest p, User requester, CancellationToken ct = default)
     {
-        var users = p.AuditEntries
+        var userIds = p.AuditEntries
             .Select(a => a.UserId)
             .Concat(p.Comments.Select(c => c.UserId))
             .Distinct()
-            .ToDictionary(id => id, _ => (User?)null);
+            .ToList();
+
+        var userLookup = new Dictionary<Guid, string> { [requester.Id] = requester.Name };
+        foreach (var uid in userIds.Where(id => !userLookup.ContainsKey(id)))
+        {
+            var user = await userRepo.GetByIdAsync(uid, ct);
+            userLookup[uid] = user?.Name ?? "Unknown";
+        }
 
         return new ProcurementResponse(
             p.Id,
@@ -399,10 +406,10 @@ public sealed class ProcurementService(
             p.LineItems.Select(li => new LineItemResponse(
                 li.Id, li.Name, li.Quantity, li.UnitPrice.Amount, li.TotalPrice.Amount)).ToList(),
             p.AuditEntries.Select(a => new AuditEntryResponse(
-                a.Id, a.UserId, "", a.Action, a.FromStatus.ToString(), a.ToStatus.ToString(),
+                a.Id, a.UserId, userLookup.GetValueOrDefault(a.UserId, "Unknown"), a.Action, a.FromStatus.ToString(), a.ToStatus.ToString(),
                 a.Comment, a.CreatedAt)).ToList(),
             p.Comments.Select(c => new CommentResponse(
-                c.Id, c.UserId, "", c.Text, c.CreatedAt)).ToList(),
+                c.Id, c.UserId, userLookup.GetValueOrDefault(c.UserId, "Unknown"), c.Text, c.CreatedAt)).ToList(),
             p.CreatedAt,
             p.UpdatedAt);
     }

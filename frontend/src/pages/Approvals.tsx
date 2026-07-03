@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/table';
 import { StatusBadge, UrgencyBadge } from '@/components/StatusBadge';
 import { procurementApi } from '@/api/procurement';
+import { formatDate } from '@/lib/utils';
 
 export function Approvals({ role }: { role: 'Manager' | 'Finance' }) {
   const { data: pending = [], isLoading } = useQuery({
@@ -72,7 +73,7 @@ export function Approvals({ role }: { role: 'Manager' | 'Finance' }) {
                   </TableCell>
                   <TableCell>{request.requesterName}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {new Date(request.createdAt).toLocaleDateString()}
+                    {formatDate(request.createdAt)}
                   </TableCell>
                 </TableRow>
               ))}

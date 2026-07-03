@@ -50,6 +50,7 @@ import {
 import { StatusBadge, UrgencyBadge } from '@/components/StatusBadge';
 import { useAuth } from '@/hooks/useAuth';
 import { procurementApi } from '@/api/procurement';
+import { formatDate, formatDateTime } from '@/lib/utils';
 import type { LineItemResponse } from '@/types';
 
 const departments = ['Engineering', 'Marketing', 'Sales', 'Operations', 'HumanResources', 'Finance'];
@@ -258,7 +259,7 @@ export function RequestDetail() {
             {!isEditing && <UrgencyBadge urgency={request.urgency} />}
           </div>
           <p className="text-muted-foreground mt-1">
-            {request.department} · Created {new Date(request.createdAt).toLocaleDateString()} · By {request.requester.name}
+            {request.department} · Created {formatDate(request.createdAt)} · By {request.requester.name}
           </p>
         </div>
       </div>
@@ -486,7 +487,7 @@ export function RequestDetail() {
                           <div>
                             <p className="text-sm font-medium">{entry.action}</p>
                             <p className="text-xs text-muted-foreground">
-                              {entry.fromStatus} → {entry.toStatus} · {new Date(entry.createdAt).toLocaleString()}
+                              {entry.fromStatus} → {entry.toStatus} · {formatDateTime(entry.createdAt)}
                             </p>
                             {entry.comment && (
                               <p className="text-sm mt-1 text-muted-foreground italic">"{entry.comment}"</p>
@@ -505,9 +506,9 @@ export function RequestDetail() {
                   {request.comments.map(comment => (
                     <div key={comment.id} className="border-b pb-3 last:border-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{comment.userName || 'User'}</span>
+                        <span className="text-sm font-medium">{comment.userName}</span>
                         <span className="text-xs text-muted-foreground">
-                          {new Date(comment.createdAt).toLocaleString()}
+                          {formatDateTime(comment.createdAt)}
                         </span>
                       </div>
                       <p className="text-sm mt-1">{comment.text}</p>
@@ -600,11 +601,11 @@ export function RequestDetail() {
               <Separator />
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created</span>
-                <span>{new Date(request.createdAt).toLocaleDateString()}</span>
+                <span>{formatDate(request.createdAt)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Updated</span>
-                <span>{new Date(request.updatedAt).toLocaleDateString()}</span>
+                <span>{formatDate(request.updatedAt)}</span>
               </div>
             </CardContent>
           </Card>

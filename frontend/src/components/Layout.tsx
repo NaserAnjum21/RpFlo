@@ -25,6 +25,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { notificationsApi } from '@/api/users';
 import { procurementApi } from '@/api/procurement';
 import type { NotificationResponse } from '@/types';
+import { formatDateTime } from '@/lib/utils';
 
 const roleColors: Record<string, string> = {
   Requester: 'bg-blue-100 text-blue-800',
@@ -146,7 +147,7 @@ export function Layout({ children }: { children: ReactNode }) {
                           <p className="font-medium text-sm">{n.title}</p>
                           <p className="text-sm text-muted-foreground mt-1">{n.message}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {new Date(n.createdAt).toLocaleString()}
+                            {formatDateTime(n.createdAt)}
                           </p>
                         </div>
                       ))}

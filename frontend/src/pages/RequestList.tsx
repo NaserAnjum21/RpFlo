@@ -16,6 +16,7 @@ import {
 import { StatusBadge, UrgencyBadge } from '@/components/StatusBadge';
 import { useAuth } from '@/hooks/useAuth';
 import { procurementApi } from '@/api/procurement';
+import { formatDate } from '@/lib/utils';
 import type { ProcurementListItem } from '@/types';
 
 export function RequestList() {
@@ -127,7 +128,7 @@ function RequestTable({ requests, isLoading }: { requests: ProcurementListItem[]
               </TableCell>
               <TableCell>{request.requesterName}</TableCell>
               <TableCell className="text-muted-foreground">
-                {new Date(request.createdAt).toLocaleDateString()}
+                {formatDate(request.createdAt)}
               </TableCell>
             </TableRow>
           ))}
