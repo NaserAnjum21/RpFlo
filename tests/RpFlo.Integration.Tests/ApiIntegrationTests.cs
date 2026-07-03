@@ -6,14 +6,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RpFlo.Application.DTOs;
 using RpFlo.Infrastructure.Persistence;
-using Testcontainers.PostgreSql;
+using Testcontainers.MsSql;
 
 namespace RpFlo.Integration.Tests;
 
 public class ApiIntegrationTests : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
-        .Build();
+    private readonly MsSqlContainer _mssql = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
 
     private WebApplicationFactory<Program> _factory = null!;
     private HttpClient _client = null!;
@@ -24,7 +23,7 @@ public class ApiIntegrationTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await _postgres.StartAsync();
+        await _mssql.StartAsync();
 
         _factory = new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
@@ -36,7 +35,7 @@ public class ApiIntegrationTests : IAsyncLifetime
                     if (descriptor != null) services.Remove(descriptor);
 
                     services.AddDbContext<AppDbContext>(options =>
-                        options.UseNpgsql(_postgres.GetConnectionString()));
+                        options.UseSqlServer(_mssql.GetConnectionString()));
                 });
             });
 
@@ -47,7 +46,7 @@ public class ApiIntegrationTests : IAsyncLifetime
     {
         _client.Dispose();
         await _factory.DisposeAsync();
-        await _postgres.DisposeAsync();
+        await _mssql.DisposeAsync();
     }
 
     private void SetUser(string userId)

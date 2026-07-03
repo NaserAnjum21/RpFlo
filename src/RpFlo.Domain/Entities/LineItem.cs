@@ -3,7 +3,7 @@ using RpFlo.Domain.ValueObjects;
 
 namespace RpFlo.Domain.Entities;
 
-public sealed class LineItem : Entity
+public sealed class LineItem : AuditableEntity
 {
     public string Name { get; private set; } = string.Empty;
     public int Quantity { get; private set; }

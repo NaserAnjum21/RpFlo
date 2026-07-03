@@ -5,7 +5,7 @@ using RpFlo.Domain.ValueObjects;
 
 namespace RpFlo.Domain.Entities;
 
-public sealed class ProcurementRequest : Entity
+public sealed class ProcurementRequest : AuditableEntity
 {
     public string Title { get; private set; } = string.Empty;
     public string Description { get; private set; } = string.Empty;

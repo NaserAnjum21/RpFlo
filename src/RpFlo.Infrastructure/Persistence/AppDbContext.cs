@@ -58,6 +58,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
             entity.Ignore(e => e.TotalAmount);
             entity.Ignore(e => e.DomainEvents);
+
+            entity.ToTable(tb => tb.IsTemporal());
         });
 
         modelBuilder.Entity<LineItem>(entity =>
@@ -68,9 +70,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             {
                 money.Property(m => m.Amount).HasColumnName("UnitPrice").HasPrecision(18, 2);
                 money.Property(m => m.Currency).HasColumnName("Currency").HasMaxLength(3).HasDefaultValue("USD");
+                money.ToTable("LineItems", tb => tb.IsTemporal(t =>
+                {
+                    t.HasPeriodStart("PeriodStart").HasColumnName("PeriodStart");
+                    t.HasPeriodEnd("PeriodEnd").HasColumnName("PeriodEnd");
+                }));
             });
             entity.Ignore(e => e.TotalPrice);
             entity.Ignore(e => e.DomainEvents);
+
+            entity.ToTable("LineItems", tb => tb.IsTemporal(t =>
+            {
+                t.HasPeriodStart("PeriodStart").HasColumnName("PeriodStart");
+                t.HasPeriodEnd("PeriodEnd").HasColumnName("PeriodEnd");
+            }));
         });
 
         modelBuilder.Entity<AuditEntry>(entity =>
@@ -90,6 +103,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.Text).HasMaxLength(2000).IsRequired();
             entity.HasIndex(e => e.ProcurementRequestId);
             entity.Ignore(e => e.DomainEvents);
+
+            entity.ToTable(tb => tb.IsTemporal());
         });
 
         modelBuilder.Entity<Notification>(entity =>
@@ -100,6 +115,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => new { e.UserId, e.IsRead });
             entity.Ignore(e => e.DomainEvents);
+
+            entity.ToTable(tb => tb.IsTemporal());
         });
     }
 }

@@ -2,7 +2,7 @@ using RpFlo.Domain.Common;
 
 namespace RpFlo.Domain.Entities;
 
-public sealed class Comment : Entity
+public sealed class Comment : AuditableEntity
 {
     public Guid ProcurementRequestId { get; private init; }
     public Guid UserId { get; private init; }

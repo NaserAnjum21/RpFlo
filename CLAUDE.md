@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-RpFlo — ERP procurement request approval workflow. .NET 10 backend (Clean Architecture, DDD, railway-oriented programming) with React 19 + TypeScript frontend. PostgreSQL database. Runs via Docker Compose on `localhost:3000` (frontend) and `localhost:5000` (API).
+RpFlo — ERP procurement request approval workflow. .NET 10 backend (Clean Architecture, DDD, railway-oriented programming) with React 19 + TypeScript frontend. MSSQL database with temporal tables for change tracking. Runs via Docker Compose on `localhost:3000` (frontend) and `localhost:5000` (API).
 
 ## Commands
 
 ```bash
-# Run everything (frontend + API + Postgres)
+# Run everything (frontend + API + MSSQL)
 docker compose up --build
 
 # Backend build
@@ -38,18 +38,24 @@ Clean Architecture with four layers. Dependencies point inward: `Api → Applica
 
 - **Domain** (`src/RpFlo.Domain/`) — Zero dependencies. Entities with encapsulated behavior, `Result<T>` monad for railway-oriented error flow, `Money` value object, domain events. `ProcurementRequest` is the aggregate root and state machine — all workflow transitions enforced here via methods returning `Result<T>`.
 - **Application** (`src/RpFlo.Application/`) — `ProcurementService` orchestrates domain operations. FluentValidation validators. DTOs for API contracts. Repository interfaces (`IProcurementRepository`, `IUserRepository`, etc.) and `IUnitOfWork`.
-- **Infrastructure** (`src/RpFlo.Infrastructure/`) — EF Core code-first with PostgreSQL. Repository implementations. `SeedData` creates demo users (Alice/Bob/Carol/Dave/Eve) on startup. Migrations in `Migrations/`.
+- **Infrastructure** (`src/RpFlo.Infrastructure/`) — EF Core code-first with MSSQL. SQL Server temporal tables on mutable entities for automatic change history. Repository implementations. `SeedData` creates demo users (Alice/Bob/Carol/Dave/Eve) on startup. Migrations in `Migrations/`.
 - **Api** (`src/RpFlo.Api/`) — ASP.NET Core controllers. `ErrorHandlingMiddleware` catches `ValidationException` → 400. Controllers map `Result<T>` error codes to HTTP status (`NotFound.*` → 404, `Unauthorized.*` → 403, `Validation.*`/`Domain.*` → 400).
 
 ## Key Patterns
 
 **Result<T> railway** — Domain methods return `Result<T>` not exceptions. `Bind()` chains operations, `Match()` unwraps. Error codes are prefixed: `Validation.`, `NotFound.`, `Unauthorized.`, `Domain.`, `Conflict.`. Controllers pattern-match on prefix to pick HTTP status.
 
+**AuditableEntity** — Abstract base class extending `Entity` with `LastModifiedBy` (Guid?). Entities that mutate (ProcurementRequest, LineItem, Comment, Notification) extend this. Immutable entities (User, AuditEntry) extend `Entity` directly.
+
+**Temporal tables** — MSSQL temporal tables enabled on auditable entity tables (ProcurementRequests, LineItems, Comments, Notifications). History tables auto-managed by SQL Server. Persistence-layer only — not exposed in application/UI.
+
 **State machine in entity** — `ProcurementRequest` enforces: `Draft → Submitted → ManagerApproved → FinanceApproved → PurchaseOrderIssued`. Rejections branch to `ManagerRejected`/`FinanceRejected`, which can `ReviseToDraft`. Invalid transitions return domain errors.
 
 **Simulated auth** — `X-User-Id` header, no real auth. Frontend sets it via `setCurrentUser()` in `api/client.ts`. User-switcher dropdown in layout.
 
 **EF Core quirk** — New child entities (AuditEntry, Comment) added through domain methods need explicit `DbContext.Add()` in `UpdateAsync` because EF Core doesn't auto-detect new entities with Guid keys in DDD-style encapsulated collections.
+
+**EF Core temporal + owned types** — Owned types sharing same table (e.g., Money in LineItems) require explicit temporal period column alignment via `HasPeriodStart("PeriodStart").HasColumnName("PeriodStart")` on both owner and owned type.
 
 ## Frontend
 

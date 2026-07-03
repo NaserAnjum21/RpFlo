@@ -2,7 +2,7 @@ using RpFlo.Domain.Common;
 
 namespace RpFlo.Domain.Entities;
 
-public sealed class Notification : Entity
+public sealed class Notification : AuditableEntity
 {
     public Guid UserId { get; private init; }
     public string Title { get; private init; } = string.Empty;

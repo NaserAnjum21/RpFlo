@@ -39,20 +39,24 @@ Record of key architectural and trade-off decisions for RpFlo. Newest entries fi
 
 ---
 
-## ADR-003: EF Core Code-First with PostgreSQL
+## ADR-003: EF Core Code-First with MSSQL + Temporal Tables
 
 **Date:** 2026-07-03
-**Status:** Accepted
+**Status:** Accepted (supersedes original PostgreSQL decision)
 
-**Context:** Needed a relational store for procurement requests with audit trails, comments, and approval chains.
+**Context:** Needed a relational store for procurement requests with audit trails, comments, and approval chains. Additionally, want automatic row-level change history without application code changes.
 
-**Decision:** EF Core code-first migrations with PostgreSQL. TestContainers for integration tests.
+**Decision:** EF Core code-first migrations with MSSQL. SQL Server temporal tables enabled on mutable entities (ProcurementRequests, LineItems, Comments, Notifications) for automatic change tracking at the persistence layer. Immutable entities (Users, AuditEntries) remain non-temporal. TestContainers with MSSQL for integration tests. `AuditableEntity` base class adds `LastModifiedBy` to tracked entities.
 
 **Trade-offs:**
 - (+) Migrations tracked in source control
 - (+) TestContainers give real DB behavior in tests
+- (+) Temporal tables provide complete row-level history with zero application code — SQL Server manages history tables automatically
+- (+) `AuditableEntity` tracks who made the last change at the domain level
 - (-) DDD encapsulated collections require manual `DbContext.Add()` for new child entities (EF Core doesn't auto-detect them with Guid keys)
-- (-) PostgreSQL dependency requires Docker for local dev and tests
+- (-) MSSQL container is heavier than PostgreSQL (~1.5GB vs ~200MB image)
+- (-) Temporal tables add storage overhead for history tables
+- (-) Owned types (Money value object) require explicit temporal column alignment in EF Core config
 
 ---
 
