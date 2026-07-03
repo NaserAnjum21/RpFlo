@@ -50,6 +50,22 @@ public class ProcurementRequestTests
         result.Error.Code.Should().Contain("CannotModify");
     }
 
+    [Theory]
+    [InlineData("", 1, 10)]
+    [InlineData("Item", 0, 10)]
+    [InlineData("Item", 1, 0)]
+    [InlineData("Item", -1, 10)]
+    [InlineData("Item", 1, -10)]
+    public void AddLineItem_InvalidValues_ShouldFail(string name, int quantity, decimal unitPrice)
+    {
+        var pr = ProcurementRequest.Create("Test", "Desc", Department.Engineering, Urgency.Low, RequesterId);
+
+        var result = pr.AddLineItem(name, quantity, unitPrice);
+
+        result.IsFailure.Should().BeTrue();
+        pr.LineItems.Should().BeEmpty();
+    }
+
     [Fact]
     public void Submit_WithLineItems_ShouldTransitionToSubmitted()
     {

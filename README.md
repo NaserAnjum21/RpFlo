@@ -51,7 +51,7 @@ Domain ← Application ← Infrastructure
 
 - **Domain** — Entities, value objects, enums, domain events. Zero external dependencies.
 - **Application** — DTOs, service orchestration, validators, repository interfaces.
-- **Infrastructure** — EF Core, PostgreSQL, repository implementations, seed data.
+- **Infrastructure** — EF Core, MSSQL, temporal tables, repository implementations, seed data.
 - **Api** — Controllers, middleware, DI composition root.
 
 ### Key Design Decisions
@@ -64,14 +64,14 @@ Domain ← Application ← Infrastructure
 
 **Domain events** — State transitions raise events (e.g., `ProcurementSubmitted`). Currently used for audit trail; the pattern supports future event handlers without modifying the domain.
 
-**Simulated auth** — `X-User-Id` header with a role-switcher dropdown. Demonstrates access control patterns without the complexity of a real auth system. The API validates user roles on every protected operation.
+**Simulated auth** — `X-User-Id` header with a role-switcher dropdown. Demonstrates access-control boundaries without the complexity of a real auth system. Mutating workflow operations validate ownership or role in the API/application layer; read endpoints remain intentionally open for demo visibility unless noted.
 
 ### Tech Stack
 
 | Layer    | Technology |
 |----------|------------|
 | Backend  | .NET 10, ASP.NET Core, EF Core (code-first) |
-| Database | PostgreSQL 16 |
+| Database | SQL Server 2022 |
 | Validation | FluentValidation |
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, Shadcn/ui (base-ui) |
 | Data fetching | TanStack Query |
@@ -119,7 +119,7 @@ All entities inherit from `Entity` base class with `Id`, `CreatedAt`, `UpdatedAt
 | POST | `/api/notifications/read-all` | Mark all read |
 | GET | `/api/export/csv` | Export requests as CSV |
 
-All mutating endpoints require `X-User-Id` header.
+All mutating endpoints require `X-User-Id` header. Approval, rejection, revision, line-item, comment, and notification-read operations validate the caller's role or ownership. General list, detail, metrics, and CSV export endpoints are intentionally open in this demo so reviewers can inspect the seeded workflow quickly.
 
 ## Testing
 
@@ -133,7 +133,7 @@ dotnet test tests/RpFlo.Domain.Tests
 # Application tests only
 dotnet test tests/RpFlo.Application.Tests
 
-# Integration tests (spins up real PostgreSQL via TestContainers)
+# Integration tests (spins up real SQL Server via TestContainers)
 dotnet test tests/RpFlo.Integration.Tests
 ```
 
@@ -141,14 +141,14 @@ dotnet test tests/RpFlo.Integration.Tests
 
 | Suite | Tests | What's covered |
 |-------|-------|----------------|
-| Domain | 39 | State machine transitions, authorization, value objects, property-based (FsCheck) |
-| Application | 11 | FluentValidation rules for all request types |
-| Integration | 10 | Full API workflows through real HTTP + PostgreSQL |
-| **Total** | **60** | |
+| Domain | 44 | State machine transitions, authorization, value objects, property-based (FsCheck) |
+| Application | 14 | FluentValidation rules for all request types |
+| Integration | 12 | Full API workflows through real HTTP + SQL Server |
+| **Total** | **70** | |
 
 **Property-based tests** (FsCheck) verify invariants like Money commutativity, non-negative totals, and state machine properties across randomized inputs.
 
-**Integration tests** use TestContainers to spin up a real PostgreSQL instance per test class, exercise the full HTTP pipeline through `WebApplicationFactory`, and verify multi-step workflows (create → submit → approve → issue PO).
+**Integration tests** use TestContainers to spin up a real SQL Server instance per test class, exercise the full HTTP pipeline through `WebApplicationFactory`, and verify multi-step workflows (create → submit → approve → issue PO), validation failures, and ownership checks.
 
 ## Features
 
@@ -161,7 +161,7 @@ dotnet test tests/RpFlo.Integration.Tests
 
 ## Tradeoffs & Assumptions
 
-1. **No real authentication** — Simulated via header + dropdown. In production, this would use JWT/OAuth with proper middleware. The role-based access control logic in the domain is production-ready; only the auth mechanism is simplified.
+1. **No real authentication** — Simulated via header + dropdown. In production, this would use JWT/OAuth with proper middleware and policy-based authorization. The demo validates important ownership and role rules for mutating operations, but the header itself is not trusted security.
 
 2. **Single aggregate** — `ProcurementRequest` is the sole aggregate root. For a real ERP, you'd split into bounded contexts (purchasing, inventory, budgeting). The current scope is intentionally focused.
 
@@ -172,6 +172,14 @@ dotnet test tests/RpFlo.Integration.Tests
 5. **Money is USD-only by default** — The `Money` value object supports currency but no exchange rates. Multi-currency would need a rate service.
 
 6. **EF Core entity tracking** — New child entities (AuditEntry, Comment) added through domain operations are explicitly tracked in `UpdateAsync` to handle EF Core's Guid key detection behavior with DDD-style encapsulated collections.
+
+7. **Open read model for review** — General request lists, request detail, dashboard metrics, and CSV export are readable by any demo user to keep the reviewer flow simple. A production version would restrict these by department, role, or requester.
+
+8. **Known dependency warning** — `dotnet test` currently reports a high-severity advisory for the transitive `Microsoft.OpenApi` 2.0.0 package brought in by the .NET OpenAPI package. This should be upgraded once a patched compatible package is available in the target SDK/package set.
+
+## AI-Assisted Development
+
+AI assistance was used as a coding and review partner for scaffolding, test ideation, and edge-case review. The generated output was reviewed by running the backend test suite, frontend type/build checks, frontend linter, and Docker Compose config validation. Security-sensitive pieces such as workflow transitions, role checks, validation, and persistence behavior were kept in explicit code paths with tests rather than accepted as unverified generated behavior.
 
 ## Project Structure
 

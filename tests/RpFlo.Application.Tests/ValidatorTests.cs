@@ -92,6 +92,35 @@ public class RejectionRequestValidatorTests
     }
 }
 
+public class AddLineItemsRequestValidatorTests
+{
+    private readonly AddLineItemsRequestValidator _validator = new();
+
+    [Fact]
+    public void Valid_Request_ShouldPass()
+    {
+        var result = _validator.TestValidate(new AddLineItemsRequest([new("Monitor", 2, 300m)]));
+
+        result.ShouldNotHaveAnyValidationErrors();
+    }
+
+    [Fact]
+    public void Empty_LineItems_ShouldFail()
+    {
+        var result = _validator.TestValidate(new AddLineItemsRequest([]));
+
+        result.ShouldHaveValidationErrorFor(x => x.LineItems);
+    }
+
+    [Fact]
+    public void Invalid_LineItem_ShouldFail()
+    {
+        var result = _validator.TestValidate(new AddLineItemsRequest([new("", 0, -1m)]));
+
+        result.IsValid.Should().BeFalse();
+    }
+}
+
 public class AddCommentRequestValidatorTests
 {
     private readonly AddCommentRequestValidator _validator = new();

@@ -67,6 +67,15 @@ public sealed class ProcurementRequest : AuditableEntity
         if (Status is not ProcurementStatus.Draft)
             return DomainErrors.CannotModify(Status);
 
+        if (string.IsNullOrWhiteSpace(name))
+            return Error.Validation("LineItemNameRequired", "Line item name is required.");
+
+        if (quantity <= 0)
+            return Error.Validation("InvalidQuantity", "Quantity must be greater than zero.");
+
+        if (unitPrice <= 0)
+            return Error.Validation("InvalidUnitPrice", "Unit price must be greater than zero.");
+
         var item = LineItem.Create(name, quantity, unitPrice, Id);
         _lineItems.Add(item);
         Touch();

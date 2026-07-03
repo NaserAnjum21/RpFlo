@@ -17,8 +17,8 @@ export const procurementApi = {
   getMy: () =>
     api.get<ProcurementListItem[]>('/procurement/my').then(r => r.data),
 
-  getPending: (role: string) =>
-    api.get<ProcurementListItem[]>('/procurement/pending', { params: { role } }).then(r => r.data),
+  getPending: () =>
+    api.get<ProcurementListItem[]>('/procurement/pending').then(r => r.data),
 
   create: (data: CreateProcurementRequest) =>
     api.post<ProcurementResponse>('/procurement', data).then(r => r.data),

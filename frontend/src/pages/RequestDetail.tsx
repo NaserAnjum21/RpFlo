@@ -16,6 +16,7 @@ import {
   Trash2,
   Save,
   X,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,6 +73,26 @@ function toEditLineItems(items: LineItemResponse[]): EditLineItem[] {
   }));
 }
 
+function getErrorMessage(error: unknown): string {
+  const fallback = 'Something went wrong. Please try again.';
+  if (!error || typeof error !== 'object' || !('response' in error)) return fallback;
+
+  const response = (error as { response?: { data?: unknown } }).response;
+  const data = response?.data;
+  if (!data || typeof data !== 'object') return fallback;
+
+  if ('Message' in data && typeof data.Message === 'string') return data.Message;
+  if ('message' in data && typeof data.message === 'string') return data.message;
+
+  if ('errors' in data && data.errors && typeof data.errors === 'object') {
+    const errors = data.errors as Record<string, string[]>;
+    const firstError = Object.values(errors).flat()[0];
+    if (firstError) return firstError;
+  }
+
+  return fallback;
+}
+
 export function RequestDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -89,6 +110,7 @@ export function RequestDetail() {
   const [editDepartment, setEditDepartment] = useState('');
   const [editUrgency, setEditUrgency] = useState('');
   const [editLineItems, setEditLineItems] = useState<EditLineItem[]>([]);
+  const [actionError, setActionError] = useState('');
 
   const { data: request, isLoading } = useQuery({
     queryKey: ['procurement', id],
@@ -102,44 +124,56 @@ export function RequestDetail() {
     queryClient.invalidateQueries({ queryKey: ['notifications'] });
   };
 
+  const handleMutationError = (error: unknown) => {
+    setActionError(getErrorMessage(error));
+  };
+
   const submitMutation = useMutation({
     mutationFn: () => procurementApi.submit(id!),
-    onSuccess: invalidate,
+    onSuccess: () => { setActionError(''); invalidate(); },
+    onError: handleMutationError,
   });
 
   const approveManagerMutation = useMutation({
     mutationFn: (comment?: string) => procurementApi.approveByManager(id!, comment),
-    onSuccess: () => { invalidate(); setApproveDialog(null); },
+    onSuccess: () => { setActionError(''); invalidate(); setApproveDialog(null); setApprovalComment(''); },
+    onError: handleMutationError,
   });
 
   const rejectManagerMutation = useMutation({
     mutationFn: (reason: string) => procurementApi.rejectByManager(id!, reason),
-    onSuccess: () => { invalidate(); setRejectDialog(null); setRejectReason(''); },
+    onSuccess: () => { setActionError(''); invalidate(); setRejectDialog(null); setRejectReason(''); },
+    onError: handleMutationError,
   });
 
   const approveFinanceMutation = useMutation({
     mutationFn: (comment?: string) => procurementApi.approveByFinance(id!, comment),
-    onSuccess: () => { invalidate(); setApproveDialog(null); },
+    onSuccess: () => { setActionError(''); invalidate(); setApproveDialog(null); setApprovalComment(''); },
+    onError: handleMutationError,
   });
 
   const rejectFinanceMutation = useMutation({
     mutationFn: (reason: string) => procurementApi.rejectByFinance(id!, reason),
-    onSuccess: () => { invalidate(); setRejectDialog(null); setRejectReason(''); },
+    onSuccess: () => { setActionError(''); invalidate(); setRejectDialog(null); setRejectReason(''); },
+    onError: handleMutationError,
   });
 
   const issuePoMutation = useMutation({
     mutationFn: () => procurementApi.issuePo(id!),
-    onSuccess: invalidate,
+    onSuccess: () => { setActionError(''); invalidate(); },
+    onError: handleMutationError,
   });
 
   const reviseMutation = useMutation({
     mutationFn: () => procurementApi.reviseToDraft(id!),
-    onSuccess: invalidate,
+    onSuccess: () => { setActionError(''); invalidate(); },
+    onError: handleMutationError,
   });
 
   const commentMutation = useMutation({
     mutationFn: (text: string) => procurementApi.addComment(id!, text),
-    onSuccess: () => { invalidate(); setCommentText(''); },
+    onSuccess: () => { setActionError(''); invalidate(); setCommentText(''); },
+    onError: handleMutationError,
   });
 
   if (isLoading || !request) {
@@ -155,8 +189,14 @@ export function RequestDetail() {
 
   const startEditing = async () => {
     if (isRejected) {
-      await procurementApi.reviseToDraft(id!);
-      invalidate();
+      try {
+        await procurementApi.reviseToDraft(id!);
+        setActionError('');
+        invalidate();
+      } catch (error) {
+        handleMutationError(error);
+        return;
+      }
     }
     setEditTitle(request.title);
     setEditDescription(request.description);
@@ -172,12 +212,18 @@ export function RequestDetail() {
   };
 
   const saveEdits = async () => {
-    if (!editTitle.trim() || !editDescription.trim() || !editDepartment || !editUrgency) return;
+    if (!editTitle.trim() || !editDescription.trim() || !editDepartment || !editUrgency) {
+      setActionError('Title, description, department, and urgency are required.');
+      return;
+    }
 
     const validLineItems = editLineItems.filter(li =>
       li.name.trim() && parseInt(li.quantity) > 0 && parseFloat(li.unitPrice) > 0
     );
-    if (validLineItems.length === 0) return;
+    if (validLineItems.length === 0) {
+      setActionError('At least one valid line item is required.');
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -214,7 +260,10 @@ export function RequestDetail() {
       }
 
       invalidate();
+      setActionError('');
       setIsEditing(false);
+    } catch (error) {
+      handleMutationError(error);
     } finally {
       setIsSaving(false);
     }
@@ -327,6 +376,15 @@ export function RequestDetail() {
           </Button>
         )}
       </div>
+
+      {actionError && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="py-3 flex items-start gap-2 text-sm text-red-800">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>{actionError}</span>
+          </CardContent>
+        </Card>
+      )}
 
       {request.poNumber && (
         <Card className="bg-green-50 border-green-200">

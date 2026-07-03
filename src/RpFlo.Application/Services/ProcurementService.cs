@@ -93,6 +93,17 @@ public sealed class ProcurementService(
             .ToList();
     }
 
+    public async Task<Result<IReadOnlyList<ProcurementListItem>>> GetPendingForUserAsync(
+        Guid userId, CancellationToken ct = default)
+    {
+        var user = await userRepo.GetByIdAsync(userId, ct);
+        if (user is null)
+            return Error.NotFound("User", "User not found.");
+
+        var pending = await GetPendingForRoleAsync(user.Role, ct);
+        return Result<IReadOnlyList<ProcurementListItem>>.Success(pending);
+    }
+
     public async Task<Result<ProcurementResponse>> UpdateAsync(
         Guid id,
         UpdateProcurementRequest request,

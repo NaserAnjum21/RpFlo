@@ -25,9 +25,15 @@ public sealed class NotificationsController(INotificationRepository notification
         Ok(await notificationRepo.GetUnreadCountAsync(userId, ct));
 
     [HttpPost("{id:guid}/read")]
-    public async Task<ActionResult> MarkAsRead(Guid id, CancellationToken ct)
+    public async Task<ActionResult> MarkAsRead(
+        Guid id,
+        [FromHeader(Name = "X-User-Id")] Guid userId,
+        CancellationToken ct)
     {
-        await notificationRepo.MarkAsReadAsync(id, ct);
+        var marked = await notificationRepo.MarkAsReadAsync(id, userId, ct);
+        if (!marked)
+            return NotFound();
+
         await unitOfWork.SaveChangesAsync(ct);
         return NoContent();
     }

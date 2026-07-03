@@ -115,10 +115,15 @@ public sealed class NotificationRepository(AppDbContext db) : INotificationRepos
     public async Task AddAsync(Notification notification, CancellationToken ct = default) =>
         await db.Notifications.AddAsync(notification, ct);
 
-    public async Task MarkAsReadAsync(Guid notificationId, CancellationToken ct = default)
+    public async Task<bool> MarkAsReadAsync(Guid notificationId, Guid userId, CancellationToken ct = default)
     {
-        var notification = await db.Notifications.FindAsync([notificationId], ct);
-        notification?.MarkAsRead();
+        var notification = await db.Notifications
+            .FirstOrDefaultAsync(n => n.Id == notificationId && n.UserId == userId, ct);
+        if (notification is null)
+            return false;
+
+        notification.MarkAsRead();
+        return true;
     }
 
     public async Task MarkAllAsReadAsync(Guid userId, CancellationToken ct = default) =>

@@ -12,6 +12,7 @@ public sealed class ProcurementController(
     ProcurementService service,
     IValidator<CreateProcurementRequest> createValidator,
     IValidator<UpdateProcurementRequest> updateValidator,
+    IValidator<AddLineItemsRequest> addLineItemsValidator,
     IValidator<RejectionRequest> rejectionValidator,
     IValidator<AddCommentRequest> commentValidator) : ControllerBase
 {
@@ -31,14 +32,8 @@ public sealed class ProcurementController(
     [HttpGet("pending")]
     public async Task<ActionResult<IReadOnlyList<ProcurementListItem>>> GetPending(
         [FromHeader(Name = "X-User-Id")] Guid userId,
-        [FromQuery] string role,
-        CancellationToken ct)
-    {
-        if (!Enum.TryParse<Domain.Enums.UserRole>(role, true, out var userRole))
-            return BadRequest(new { message = "Invalid role." });
-
-        return Ok(await service.GetPendingForRoleAsync(userRole, ct));
-    }
+        CancellationToken ct) =>
+        ToActionResult(await service.GetPendingForUserAsync(userId, ct));
 
     [HttpPost]
     public async Task<ActionResult<ProcurementResponse>> Create(
@@ -66,8 +61,11 @@ public sealed class ProcurementController(
         Guid id,
         [FromHeader(Name = "X-User-Id")] Guid userId,
         [FromBody] AddLineItemsRequest request,
-        CancellationToken ct) =>
-        ToActionResult(await service.AddLineItemsAsync(id, request, userId, ct));
+        CancellationToken ct)
+    {
+        await addLineItemsValidator.ValidateAndThrowAsync(request, ct);
+        return ToActionResult(await service.AddLineItemsAsync(id, request, userId, ct));
+    }
 
     [HttpDelete("{id:guid}/line-items/{lineItemId:guid}")]
     public async Task<ActionResult<ProcurementResponse>> RemoveLineItem(

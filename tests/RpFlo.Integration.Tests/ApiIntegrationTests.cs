@@ -18,6 +18,7 @@ public class ApiIntegrationTests : IAsyncLifetime
     private HttpClient _client = null!;
 
     private const string RequesterId = "11111111-1111-1111-1111-111111111111";
+    private const string RequesterId2 = "22222222-2222-2222-2222-222222222222";
     private const string ManagerId = "33333333-3333-3333-3333-333333333333";
     private const string FinanceId = "44444444-4444-4444-4444-444444444444";
 
@@ -224,6 +225,57 @@ public class ApiIntegrationTests : IAsyncLifetime
             $"/api/procurement/{created!.Id}/comments",
             new AddCommentRequest("Need this ASAP"));
         commentResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task AddLineItems_InvalidData_ShouldReturn400()
+    {
+        SetUser(RequesterId);
+
+        var request = new CreateProcurementRequest(
+            "Add Item Validation Test",
+            "Test add item validation",
+            Domain.Enums.Department.Engineering,
+            Domain.Enums.Urgency.Low,
+            [new("Item", 1, 10m)]);
+
+        var created = await (await _client.PostAsJsonAsync("/api/procurement", request))
+            .Content.ReadFromJsonAsync<ProcurementResponse>();
+
+        var response = await _client.PostAsJsonAsync(
+            $"/api/procurement/{created!.Id}/line-items",
+            new AddLineItemsRequest([new("Bad Item", -1, 10m)]));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task MarkNotificationRead_ForAnotherUser_ShouldReturn404()
+    {
+        SetUser(RequesterId);
+
+        var request = new CreateProcurementRequest(
+            "Notification Ownership Test",
+            "Test notification ownership",
+            Domain.Enums.Department.Engineering,
+            Domain.Enums.Urgency.Low,
+            [new("Item", 1, 10m)]);
+
+        var created = await (await _client.PostAsJsonAsync("/api/procurement", request))
+            .Content.ReadFromJsonAsync<ProcurementResponse>();
+
+        await _client.PostAsync($"/api/procurement/{created!.Id}/submit", null);
+
+        SetUser(ManagerId);
+        var managerNotifications = await (await _client.GetAsync("/api/notifications"))
+            .Content.ReadFromJsonAsync<List<NotificationResponse>>();
+
+        managerNotifications.Should().NotBeEmpty();
+
+        SetUser(RequesterId2);
+        var response = await _client.PostAsync($"/api/notifications/{managerNotifications![0].Id}/read", null);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
