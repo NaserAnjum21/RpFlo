@@ -35,7 +35,7 @@ const roleColors: Record<string, string> = {
 };
 
 export function Layout({ children }: { children: ReactNode }) {
-  const { currentUser, users, switchUser } = useAuth();
+  const { currentUser, users, switchUser, error: authError } = useAuth();
   const location = useLocation();
   const queryClient = useQueryClient();
   const [notifOpen, setNotifOpen] = useState(false);
@@ -74,6 +74,18 @@ export function Layout({ children }: { children: ReactNode }) {
     await notificationsApi.markAsRead(id);
     queryClient.invalidateQueries({ queryKey: ['notifications'] });
   };
+
+  if (authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-3">
+          <p className="text-lg font-medium text-destructive">Connection Error</p>
+          <p className="text-sm text-muted-foreground">{authError}</p>
+          <Button variant="outline" onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentUser) return null;
 

@@ -31,7 +31,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<RpFlo.Api.Middleware.ErrorHandlingMiddleware>();
+app.UseMiddleware<RpFlo.Api.Middleware.UserIdValidationMiddleware>();
 app.MapControllers();
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 await SeedData.SeedAsync(app.Services);
 

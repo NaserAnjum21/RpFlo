@@ -37,6 +37,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(e => e.Status).HasConversion<string>().HasMaxLength(30);
             entity.Property(e => e.PoNumber).HasMaxLength(50);
 
+            entity.Property(e => e.RowVersion).IsRowVersion();
+
             entity.HasMany(e => e.LineItems)
                 .WithOne()
                 .HasForeignKey(li => li.ProcurementRequestId)

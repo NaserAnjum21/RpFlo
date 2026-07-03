@@ -30,6 +30,7 @@ dotnet test --filter "FullyQualifiedName~MethodName"
 npm run dev          # Vite dev server with proxy to localhost:5000
 npm run build        # tsc + vite build
 npm run lint         # oxlint
+npm run test         # vitest (ErrorBoundary smoke tests)
 ```
 
 ## Architecture

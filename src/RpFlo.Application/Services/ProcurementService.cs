@@ -199,118 +199,93 @@ public sealed class ProcurementService(
     public async Task<Result<ProcurementResponse>> ApproveByManagerAsync(
         Guid id, Guid approverId, ApprovalRequest request, CancellationToken ct = default)
     {
-        var procurement = await procurementRepo.GetByIdAsync(id, ct);
-        if (procurement is null)
-            return Error.NotFound("Procurement", $"Procurement request {id} not found.");
+        var procResult = await GetProcurementOrError(id, ct);
+        if (procResult.IsFailure) return procResult.Error;
+        var procurement = procResult.Value;
 
-        var approver = await userRepo.GetByIdAsync(approverId, ct);
-        if (approver?.Role is not UserRole.Manager and not UserRole.Admin)
-            return Error.Unauthorized("NotManager", "Only managers can approve at this stage.");
+        var roleResult = await RequireRole(approverId, UserRole.Manager, "NotManager", "Only managers can approve at this stage.", ct);
+        if (roleResult.IsFailure) return roleResult.Error;
 
         var result = procurement.ApproveByManager(approverId, request.Comment);
         if (result.IsFailure) return result.Error;
 
-        await procurementRepo.UpdateAsync(procurement, ct);
         await NotifyUser(procurement.RequesterId, "Request Approved by Manager",
             $"'{procurement.Title}' approved by manager. Pending finance review.", procurement.Id, ct);
         await NotifyUsersWithRole(UserRole.Finance, "Procurement Pending Finance Review",
             $"'{procurement.Title}' awaiting finance approval.", procurement.Id, ct);
-        await unitOfWork.SaveChangesAsync(ct);
-
-        var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return await MapToResponseAsync(procurement, requester!, ct);
+        return await SaveAndRespond(procurement, ct);
     }
 
     public async Task<Result<ProcurementResponse>> RejectByManagerAsync(
         Guid id, Guid reviewerId, RejectionRequest request, CancellationToken ct = default)
     {
-        var procurement = await procurementRepo.GetByIdAsync(id, ct);
-        if (procurement is null)
-            return Error.NotFound("Procurement", $"Procurement request {id} not found.");
+        var procResult = await GetProcurementOrError(id, ct);
+        if (procResult.IsFailure) return procResult.Error;
+        var procurement = procResult.Value;
 
-        var reviewer = await userRepo.GetByIdAsync(reviewerId, ct);
-        if (reviewer?.Role is not UserRole.Manager and not UserRole.Admin)
-            return Error.Unauthorized("NotManager", "Only managers can reject at this stage.");
+        var roleResult = await RequireRole(reviewerId, UserRole.Manager, "NotManager", "Only managers can reject at this stage.", ct);
+        if (roleResult.IsFailure) return roleResult.Error;
 
         var result = procurement.RejectByManager(reviewerId, request.Reason);
         if (result.IsFailure) return result.Error;
 
-        await procurementRepo.UpdateAsync(procurement, ct);
         await NotifyUser(procurement.RequesterId, "Request Rejected by Manager",
             $"'{procurement.Title}' rejected: {request.Reason}", procurement.Id, ct);
-        await unitOfWork.SaveChangesAsync(ct);
-
-        var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return await MapToResponseAsync(procurement, requester!, ct);
+        return await SaveAndRespond(procurement, ct);
     }
 
     public async Task<Result<ProcurementResponse>> ApproveByFinanceAsync(
         Guid id, Guid approverId, ApprovalRequest request, CancellationToken ct = default)
     {
-        var procurement = await procurementRepo.GetByIdAsync(id, ct);
-        if (procurement is null)
-            return Error.NotFound("Procurement", $"Procurement request {id} not found.");
+        var procResult = await GetProcurementOrError(id, ct);
+        if (procResult.IsFailure) return procResult.Error;
+        var procurement = procResult.Value;
 
-        var approver = await userRepo.GetByIdAsync(approverId, ct);
-        if (approver?.Role is not UserRole.Finance and not UserRole.Admin)
-            return Error.Unauthorized("NotFinance", "Only finance can approve at this stage.");
+        var roleResult = await RequireRole(approverId, UserRole.Finance, "NotFinance", "Only finance can approve at this stage.", ct);
+        if (roleResult.IsFailure) return roleResult.Error;
 
         var result = procurement.ApproveByFinance(approverId, request.Comment);
         if (result.IsFailure) return result.Error;
 
-        await procurementRepo.UpdateAsync(procurement, ct);
         await NotifyUser(procurement.RequesterId, "Request Approved by Finance",
             $"'{procurement.Title}' fully approved. Ready for PO.", procurement.Id, ct);
-        await unitOfWork.SaveChangesAsync(ct);
-
-        var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return await MapToResponseAsync(procurement, requester!, ct);
+        return await SaveAndRespond(procurement, ct);
     }
 
     public async Task<Result<ProcurementResponse>> RejectByFinanceAsync(
         Guid id, Guid reviewerId, RejectionRequest request, CancellationToken ct = default)
     {
-        var procurement = await procurementRepo.GetByIdAsync(id, ct);
-        if (procurement is null)
-            return Error.NotFound("Procurement", $"Procurement request {id} not found.");
+        var procResult = await GetProcurementOrError(id, ct);
+        if (procResult.IsFailure) return procResult.Error;
+        var procurement = procResult.Value;
 
-        var reviewer = await userRepo.GetByIdAsync(reviewerId, ct);
-        if (reviewer?.Role is not UserRole.Finance and not UserRole.Admin)
-            return Error.Unauthorized("NotFinance", "Only finance can reject at this stage.");
+        var roleResult = await RequireRole(reviewerId, UserRole.Finance, "NotFinance", "Only finance can reject at this stage.", ct);
+        if (roleResult.IsFailure) return roleResult.Error;
 
         var result = procurement.RejectByFinance(reviewerId, request.Reason);
         if (result.IsFailure) return result.Error;
 
-        await procurementRepo.UpdateAsync(procurement, ct);
         await NotifyUser(procurement.RequesterId, "Request Rejected by Finance",
             $"'{procurement.Title}' rejected by finance: {request.Reason}", procurement.Id, ct);
-        await unitOfWork.SaveChangesAsync(ct);
-
-        var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return await MapToResponseAsync(procurement, requester!, ct);
+        return await SaveAndRespond(procurement, ct);
     }
 
     public async Task<Result<ProcurementResponse>> IssuePurchaseOrderAsync(
         Guid id, Guid issuerId, CancellationToken ct = default)
     {
-        var procurement = await procurementRepo.GetByIdAsync(id, ct);
-        if (procurement is null)
-            return Error.NotFound("Procurement", $"Procurement request {id} not found.");
+        var procResult = await GetProcurementOrError(id, ct);
+        if (procResult.IsFailure) return procResult.Error;
+        var procurement = procResult.Value;
 
-        var issuer = await userRepo.GetByIdAsync(issuerId, ct);
-        if (issuer?.Role is not UserRole.Finance and not UserRole.Admin)
-            return Error.Unauthorized("NotFinance", "Only finance can issue purchase orders.");
+        var roleResult = await RequireRole(issuerId, UserRole.Finance, "NotFinance", "Only finance can issue purchase orders.", ct);
+        if (roleResult.IsFailure) return roleResult.Error;
 
         var result = procurement.IssuePurchaseOrder(issuerId);
         if (result.IsFailure) return result.Error;
 
-        await procurementRepo.UpdateAsync(procurement, ct);
         await NotifyUser(procurement.RequesterId, "Purchase Order Issued",
             $"PO #{procurement.PoNumber} issued for '{procurement.Title}'.", procurement.Id, ct);
-        await unitOfWork.SaveChangesAsync(ct);
-
-        var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
-        return await MapToResponseAsync(procurement, requester!, ct);
+        return await SaveAndRespond(procurement, ct);
     }
 
     public async Task<Result<ProcurementResponse>> ReviseToDraftAsync(
@@ -348,44 +323,31 @@ public sealed class ProcurementService(
         return new CommentResponse(comment.Id, userId, user.Name, comment.Text, comment.CreatedAt);
     }
 
-    public async Task<DashboardMetrics> GetMetricsAsync(CancellationToken ct = default)
+    public async Task<DashboardMetrics> GetMetricsAsync(CancellationToken ct = default) =>
+        await procurementRepo.GetMetricsAsync(ct);
+
+    private async Task<Result<ProcurementRequest>> GetProcurementOrError(Guid id, CancellationToken ct)
     {
-        var all = await procurementRepo.GetAllAsync(ct);
+        var procurement = await procurementRepo.GetByIdAsync(id, ct);
+        return procurement is null
+            ? Error.NotFound("Procurement", $"Procurement request {id} not found.")
+            : procurement;
+    }
 
-        var statusGroups = all
-            .GroupBy(p => p.Status)
-            .Select(g => new StatusCount(g.Key.ToString(), g.Count()))
-            .ToList();
+    private async Task<Result<User>> RequireRole(Guid userId, UserRole requiredRole, string errorCode, string errorMessage, CancellationToken ct)
+    {
+        var user = await userRepo.GetByIdAsync(userId, ct);
+        return user?.Role is var role && (role == requiredRole || role == UserRole.Admin)
+            ? user!
+            : Error.Unauthorized(errorCode, errorMessage);
+    }
 
-        var departmentGroups = all
-            .GroupBy(p => p.Department)
-            .Select(g => new DepartmentCount(
-                g.Key.ToString(),
-                g.Count(),
-                g.Sum(p => p.TotalAmount.Amount)))
-            .ToList();
-
-        var completedRequests = all
-            .Where(p => p.Status == ProcurementStatus.PurchaseOrderIssued)
-            .ToList();
-
-        var avgProcessingHours = completedRequests.Count > 0
-            ? completedRequests.Average(p => (p.UpdatedAt - p.CreatedAt).TotalHours)
-            : 0;
-
-        return new DashboardMetrics(
-            TotalRequests: all.Count,
-            DraftCount: all.Count(p => p.Status == ProcurementStatus.Draft),
-            PendingApprovalCount: all.Count(p => p.Status is ProcurementStatus.Submitted or ProcurementStatus.ManagerApproved),
-            ApprovedCount: all.Count(p => p.Status == ProcurementStatus.FinanceApproved),
-            RejectedCount: all.Count(p => p.Status is ProcurementStatus.ManagerRejected or ProcurementStatus.FinanceRejected),
-            PurchaseOrderCount: all.Count(p => p.Status == ProcurementStatus.PurchaseOrderIssued),
-            TotalApprovedAmount: all
-                .Where(p => p.Status is ProcurementStatus.FinanceApproved or ProcurementStatus.PurchaseOrderIssued)
-                .Sum(p => p.TotalAmount.Amount),
-            AverageProcessingTimeHours: (decimal)Math.Round(avgProcessingHours, 1),
-            StatusBreakdown: statusGroups,
-            DepartmentBreakdown: departmentGroups);
+    private async Task<Result<ProcurementResponse>> SaveAndRespond(ProcurementRequest procurement, CancellationToken ct)
+    {
+        await procurementRepo.UpdateAsync(procurement, ct);
+        await unitOfWork.SaveChangesAsync(ct);
+        var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
+        return await MapToResponseAsync(procurement, requester!, ct);
     }
 
     private async Task<ProcurementResponse> MapToResponseAsync(ProcurementRequest p, User requester, CancellationToken ct = default)
@@ -393,14 +355,16 @@ public sealed class ProcurementService(
         var userIds = p.AuditEntries
             .Select(a => a.UserId)
             .Concat(p.Comments.Select(c => c.UserId))
+            .Where(id => id != requester.Id)
             .Distinct()
             .ToList();
 
         var userLookup = new Dictionary<Guid, string> { [requester.Id] = requester.Name };
-        foreach (var uid in userIds.Where(id => !userLookup.ContainsKey(id)))
+        if (userIds.Count > 0)
         {
-            var user = await userRepo.GetByIdAsync(uid, ct);
-            userLookup[uid] = user?.Name ?? "Unknown";
+            var users = await userRepo.GetByIdsAsync(userIds, ct);
+            foreach (var user in users)
+                userLookup[user.Id] = user.Name;
         }
 
         return new ProcurementResponse(

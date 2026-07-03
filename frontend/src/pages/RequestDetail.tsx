@@ -3,19 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
-  CheckCircle,
-  XCircle,
-  Send,
-  RotateCcw,
   FileText,
   MessageSquare,
   History,
   Package,
-  Pencil,
   Plus,
   Trash2,
-  Save,
-  X,
   AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -33,13 +26,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
   Table,
   TableBody,
   TableCell,
@@ -49,6 +35,9 @@ import {
   TableFooter,
 } from '@/components/ui/table';
 import { StatusBadge, UrgencyBadge } from '@/components/StatusBadge';
+import { ActionBar } from '@/components/ActionBar';
+import { ApproveDialog, RejectDialog } from '@/components/ApprovalDialogs';
+import { DetailSkeleton } from '@/components/Skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { procurementApi } from '@/api/procurement';
 import { formatDate, formatDateTime } from '@/lib/utils';
@@ -98,8 +87,6 @@ export function RequestDetail() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const queryClient = useQueryClient();
-  const [rejectReason, setRejectReason] = useState('');
-  const [approvalComment, setApprovalComment] = useState('');
   const [commentText, setCommentText] = useState('');
   const [rejectDialog, setRejectDialog] = useState<'manager' | 'finance' | null>(null);
   const [approveDialog, setApproveDialog] = useState<'manager' | 'finance' | null>(null);
@@ -136,25 +123,25 @@ export function RequestDetail() {
 
   const approveManagerMutation = useMutation({
     mutationFn: (comment?: string) => procurementApi.approveByManager(id!, comment),
-    onSuccess: () => { setActionError(''); invalidate(); setApproveDialog(null); setApprovalComment(''); },
+    onSuccess: () => { setActionError(''); invalidate(); setApproveDialog(null); },
     onError: handleMutationError,
   });
 
   const rejectManagerMutation = useMutation({
     mutationFn: (reason: string) => procurementApi.rejectByManager(id!, reason),
-    onSuccess: () => { setActionError(''); invalidate(); setRejectDialog(null); setRejectReason(''); },
+    onSuccess: () => { setActionError(''); invalidate(); setRejectDialog(null); },
     onError: handleMutationError,
   });
 
   const approveFinanceMutation = useMutation({
     mutationFn: (comment?: string) => procurementApi.approveByFinance(id!, comment),
-    onSuccess: () => { setActionError(''); invalidate(); setApproveDialog(null); setApprovalComment(''); },
+    onSuccess: () => { setActionError(''); invalidate(); setApproveDialog(null); },
     onError: handleMutationError,
   });
 
   const rejectFinanceMutation = useMutation({
     mutationFn: (reason: string) => procurementApi.rejectByFinance(id!, reason),
-    onSuccess: () => { setActionError(''); invalidate(); setRejectDialog(null); setRejectReason(''); },
+    onSuccess: () => { setActionError(''); invalidate(); setRejectDialog(null); },
     onError: handleMutationError,
   });
 
@@ -177,7 +164,7 @@ export function RequestDetail() {
   });
 
   if (isLoading || !request) {
-    return <div className="text-center py-12 text-muted-foreground">Loading...</div>;
+    return <DetailSkeleton />;
   }
 
   const isOwner = currentUser?.id === request.requester.id;
@@ -313,69 +300,30 @@ export function RequestDetail() {
         </div>
       </div>
 
-      {/* Action buttons */}
-      <div className="flex flex-wrap gap-2">
-        {canEdit && !isEditing && (
-          <Button onClick={startEditing} variant="outline" className="gap-2">
-            <Pencil className="h-4 w-4" />
-            Edit
-          </Button>
-        )}
-        {isEditing && (
-          <>
-            <Button onClick={saveEdits} disabled={isSaving} className="gap-2">
-              <Save className="h-4 w-4" />
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </Button>
-            <Button onClick={cancelEditing} variant="outline" disabled={isSaving} className="gap-2">
-              <X className="h-4 w-4" />
-              Cancel
-            </Button>
-          </>
-        )}
-        {isDraft && isOwner && !isEditing && (
-          <Button onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending} className="gap-2">
-            <Send className="h-4 w-4" />
-            Submit for Approval
-          </Button>
-        )}
-        {request.status === 'Submitted' && isManager && (
-          <>
-            <Button onClick={() => setApproveDialog('manager')} className="gap-2 bg-green-600 hover:bg-green-700">
-              <CheckCircle className="h-4 w-4" />
-              Approve
-            </Button>
-            <Button variant="destructive" onClick={() => setRejectDialog('manager')} className="gap-2">
-              <XCircle className="h-4 w-4" />
-              Reject
-            </Button>
-          </>
-        )}
-        {request.status === 'ManagerApproved' && isFinance && (
-          <>
-            <Button onClick={() => setApproveDialog('finance')} className="gap-2 bg-green-600 hover:bg-green-700">
-              <CheckCircle className="h-4 w-4" />
-              Finance Approve
-            </Button>
-            <Button variant="destructive" onClick={() => setRejectDialog('finance')} className="gap-2">
-              <XCircle className="h-4 w-4" />
-              Reject
-            </Button>
-          </>
-        )}
-        {request.status === 'FinanceApproved' && isFinance && (
-          <Button onClick={() => issuePoMutation.mutate()} disabled={issuePoMutation.isPending} className="gap-2">
-            <Package className="h-4 w-4" />
-            Issue Purchase Order
-          </Button>
-        )}
-        {isRejected && isOwner && !isEditing && (
-          <Button onClick={() => reviseMutation.mutate()} disabled={reviseMutation.isPending} variant="outline" className="gap-2">
-            <RotateCcw className="h-4 w-4" />
-            Revise & Resubmit
-          </Button>
-        )}
-      </div>
+      <ActionBar
+        canEdit={canEdit}
+        isEditing={isEditing}
+        isSaving={isSaving}
+        isDraft={isDraft}
+        isRejected={isRejected}
+        isOwner={isOwner}
+        isManager={isManager}
+        isFinance={isFinance}
+        status={request.status}
+        onEdit={startEditing}
+        onSave={saveEdits}
+        onCancelEdit={cancelEditing}
+        onSubmit={() => submitMutation.mutate()}
+        isSubmitting={submitMutation.isPending}
+        onApproveManager={() => setApproveDialog('manager')}
+        onRejectManager={() => setRejectDialog('manager')}
+        onApproveFinance={() => setApproveDialog('finance')}
+        onRejectFinance={() => setRejectDialog('finance')}
+        onIssuePo={() => issuePoMutation.mutate()}
+        isIssuingPo={issuePoMutation.isPending}
+        onRevise={() => reviseMutation.mutate()}
+        isRevising={reviseMutation.isPending}
+      />
 
       {actionError && (
         <Card className="border-red-200 bg-red-50">
@@ -670,67 +618,25 @@ export function RequestDetail() {
         </div>
       </div>
 
-      {/* Approve dialog */}
-      <Dialog open={!!approveDialog} onOpenChange={() => setApproveDialog(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Approve Request</DialogTitle>
-          </DialogHeader>
-          <Textarea
-            placeholder="Optional comment..."
-            value={approvalComment}
-            onChange={e => setApprovalComment(e.target.value)}
-            rows={3}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setApproveDialog(null)}>Cancel</Button>
-            <Button
-              className="bg-green-600 hover:bg-green-700"
-              onClick={() => {
-                if (approveDialog === 'manager') {
-                  approveManagerMutation.mutate(approvalComment || undefined);
-                } else {
-                  approveFinanceMutation.mutate(approvalComment || undefined);
-                }
-              }}
-              disabled={approveManagerMutation.isPending || approveFinanceMutation.isPending}
-            >
-              Approve
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ApproveDialog
+        open={!!approveDialog}
+        onClose={() => setApproveDialog(null)}
+        onConfirm={(comment) => {
+          if (approveDialog === 'manager') approveManagerMutation.mutate(comment);
+          else approveFinanceMutation.mutate(comment);
+        }}
+        isPending={approveManagerMutation.isPending || approveFinanceMutation.isPending}
+      />
 
-      {/* Reject dialog */}
-      <Dialog open={!!rejectDialog} onOpenChange={() => setRejectDialog(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reject Request</DialogTitle>
-          </DialogHeader>
-          <Textarea
-            placeholder="Reason for rejection (required)..."
-            value={rejectReason}
-            onChange={e => setRejectReason(e.target.value)}
-            rows={3}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectDialog(null)}>Cancel</Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (rejectDialog === 'manager') {
-                  rejectManagerMutation.mutate(rejectReason);
-                } else {
-                  rejectFinanceMutation.mutate(rejectReason);
-                }
-              }}
-              disabled={!rejectReason.trim() || rejectManagerMutation.isPending || rejectFinanceMutation.isPending}
-            >
-              Reject
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RejectDialog
+        open={!!rejectDialog}
+        onClose={() => setRejectDialog(null)}
+        onConfirm={(reason) => {
+          if (rejectDialog === 'manager') rejectManagerMutation.mutate(reason);
+          else rejectFinanceMutation.mutate(reason);
+        }}
+        isPending={rejectManagerMutation.isPending || rejectFinanceMutation.isPending}
+      />
     </div>
   );
 }

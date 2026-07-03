@@ -14,6 +14,7 @@ public sealed class ProcurementRequest : AuditableEntity
     public ProcurementStatus Status { get; private set; } = ProcurementStatus.Draft;
     public Guid RequesterId { get; private init; }
     public string? PoNumber { get; private set; }
+    public byte[] RowVersion { get; private set; } = [];
 
     private readonly List<LineItem> _lineItems = [];
     public IReadOnlyList<LineItem> LineItems => _lineItems.AsReadOnly();

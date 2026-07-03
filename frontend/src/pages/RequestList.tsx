@@ -14,6 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { StatusBadge, UrgencyBadge } from '@/components/StatusBadge';
+import { RequestListSkeleton } from '@/components/Skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { procurementApi } from '@/api/procurement';
 import { formatDate } from '@/lib/utils';
@@ -84,7 +85,7 @@ export function RequestList() {
 
 function RequestTable({ requests, isLoading }: { requests: ProcurementListItem[]; isLoading: boolean }) {
   if (isLoading) {
-    return <div className="text-center py-8 text-muted-foreground">Loading...</div>;
+    return <RequestListSkeleton />;
   }
 
   if (requests.length === 0) {

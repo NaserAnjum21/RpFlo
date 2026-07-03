@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 
 namespace RpFlo.Api.Middleware;
 
@@ -26,6 +27,16 @@ public sealed class ErrorHandlingMiddleware(RequestDelegate next, ILogger<ErrorH
             {
                 type = "ValidationError",
                 errors
+            }));
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            context.Response.StatusCode = (int)HttpStatusCode.Conflict;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsync(JsonSerializer.Serialize(new
+            {
+                type = "ConcurrencyConflict",
+                message = "This record was modified by another user. Please refresh and try again."
             }));
         }
         catch (Exception ex)

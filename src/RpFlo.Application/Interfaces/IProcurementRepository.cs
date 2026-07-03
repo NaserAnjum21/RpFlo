@@ -1,3 +1,4 @@
+using RpFlo.Application.DTOs;
 using RpFlo.Domain.Entities;
 using RpFlo.Domain.Enums;
 
@@ -13,11 +14,13 @@ public interface IProcurementRepository
     Task<ProcurementRequest> AddAsync(ProcurementRequest request, CancellationToken ct = default);
     Task UpdateAsync(ProcurementRequest request, CancellationToken ct = default);
     Task DeleteLineItemAsync(Guid lineItemId, CancellationToken ct = default);
+    Task<DashboardMetrics> GetMetricsAsync(CancellationToken ct = default);
 }
 
 public interface IUserRepository
 {
     Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default);
+    Task<IReadOnlyList<User>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default);
     Task<IReadOnlyList<User>> GetAllAsync(CancellationToken ct = default);
     Task<IReadOnlyList<User>> GetByRoleAsync(UserRole role, CancellationToken ct = default);
 }

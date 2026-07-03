@@ -8,6 +8,7 @@ interface AuthContextType {
   users: User[];
   switchUser: (userId: string) => void;
   isLoading: boolean;
+  error: string | null;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -15,12 +16,14 @@ const AuthContext = createContext<AuthContextType>({
   users: [],
   switchUser: () => {},
   isLoading: true,
+  error: null,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUserState] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     usersApi.getAll().then(data => {
@@ -31,6 +34,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCurrentUserState(user);
         setCurrentUser(user.id);
       }
+      setIsLoading(false);
+    }).catch(() => {
+      setError('Failed to load users. Is the API running?');
       setIsLoading(false);
     });
   }, []);
@@ -45,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, users, switchUser, isLoading }}>
+    <AuthContext.Provider value={{ currentUser, users, switchUser, isLoading, error }}>
       {children}
     </AuthContext.Provider>
   );

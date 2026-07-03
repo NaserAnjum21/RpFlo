@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RpFlo.Application.DTOs;
 using RpFlo.Application.Interfaces;
 using RpFlo.Domain.Entities;
 using RpFlo.Domain.Enums;
@@ -86,12 +87,64 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
         if (item is not null)
             db.LineItems.Remove(item);
     }
+
+    public async Task<DashboardMetrics> GetMetricsAsync(CancellationToken ct = default)
+    {
+        var statusCounts = await db.ProcurementRequests
+            .GroupBy(p => p.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        var counts = statusCounts.ToDictionary(s => s.Status, s => s.Count);
+        int total = counts.Values.Sum();
+
+        int Count(params ProcurementStatus[] statuses) =>
+            statuses.Sum(s => counts.GetValueOrDefault(s));
+
+        var approvedStatuses = new[] { ProcurementStatus.FinanceApproved, ProcurementStatus.PurchaseOrderIssued };
+        var totalApproved = await db.ProcurementRequests
+            .Where(p => approvedStatuses.Contains(p.Status))
+            .SelectMany(p => p.LineItems)
+            .SumAsync(li => li.UnitPrice.Amount * li.Quantity, ct);
+
+        var departmentGroups = await db.ProcurementRequests
+            .GroupBy(p => p.Department)
+            .Select(g => new DepartmentCount(
+                g.Key.ToString(),
+                g.Count(),
+                g.SelectMany(p => p.LineItems).Sum(li => li.UnitPrice.Amount * li.Quantity)))
+            .ToListAsync(ct);
+
+        var avgHours = await db.ProcurementRequests
+            .Where(p => p.Status == ProcurementStatus.PurchaseOrderIssued)
+            .Select(p => EF.Functions.DateDiffSecond(p.CreatedAt, p.UpdatedAt))
+            .DefaultIfEmpty(0)
+            .AverageAsync(ct);
+
+        return new DashboardMetrics(
+            TotalRequests: total,
+            DraftCount: Count(ProcurementStatus.Draft),
+            PendingApprovalCount: Count(ProcurementStatus.Submitted, ProcurementStatus.ManagerApproved),
+            ApprovedCount: Count(ProcurementStatus.FinanceApproved),
+            RejectedCount: Count(ProcurementStatus.ManagerRejected, ProcurementStatus.FinanceRejected),
+            PurchaseOrderCount: Count(ProcurementStatus.PurchaseOrderIssued),
+            TotalApprovedAmount: totalApproved,
+            AverageProcessingTimeHours: Math.Round((decimal)(avgHours / 3600.0), 1),
+            StatusBreakdown: statusCounts.Select(s => new StatusCount(s.Status.ToString(), s.Count)).ToList(),
+            DepartmentBreakdown: departmentGroups);
+    }
 }
 
 public sealed class UserRepository(AppDbContext db) : IUserRepository
 {
     public async Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
         await db.Users.FindAsync([id], ct);
+
+    public async Task<IReadOnlyList<User>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken ct = default)
+    {
+        var idList = ids.ToList();
+        return await db.Users.Where(u => idList.Contains(u.Id)).ToListAsync(ct);
+    }
 
     public async Task<IReadOnlyList<User>> GetAllAsync(CancellationToken ct = default) =>
         await db.Users.OrderBy(u => u.Name).ToListAsync(ct);

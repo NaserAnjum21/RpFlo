@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DashboardSkeleton } from '@/components/Skeleton';
 import { procurementApi } from '@/api/procurement';
 import { FileText, Clock, CheckCircle, XCircle, Package, DollarSign } from 'lucide-react';
 
@@ -10,7 +11,7 @@ export function Dashboard() {
   });
 
   if (isLoading || !metrics) {
-    return <div className="flex items-center justify-center py-12 text-muted-foreground">Loading dashboard...</div>;
+    return <DashboardSkeleton />;
   }
 
   const statCards = [
@@ -62,7 +63,7 @@ export function Dashboard() {
                     <div className="w-24 h-2 rounded-full bg-muted overflow-hidden">
                       <div
                         className="h-full rounded-full bg-primary"
-                        style={{ width: `${(item.count / metrics.totalRequests) * 100}%` }}
+                        style={{ width: `${metrics.totalRequests > 0 ? (item.count / metrics.totalRequests) * 100 : 0}%` }}
                       />
                     </div>
                     <span className="text-sm font-medium w-6 text-right">{item.count}</span>
