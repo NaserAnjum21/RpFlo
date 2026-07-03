@@ -70,6 +70,13 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
                 entry.State = EntityState.Added;
         }
 
+        foreach (var lineItem in request.LineItems)
+        {
+            var entry = db.Entry(lineItem);
+            if (entry.State is not EntityState.Unchanged)
+                entry.State = EntityState.Added;
+        }
+
         return Task.CompletedTask;
     }
 
