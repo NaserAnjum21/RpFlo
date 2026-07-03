@@ -39,8 +39,8 @@ public sealed record ProcurementResponse(
     List<LineItemResponse> LineItems,
     List<AuditEntryResponse> AuditTrail,
     List<CommentResponse> Comments,
-    DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
 
 public sealed record RequesterInfo(Guid Id, string Name, string Email, string Department);
 
@@ -59,14 +59,14 @@ public sealed record AuditEntryResponse(
     string FromStatus,
     string ToStatus,
     string? Comment,
-    DateTime CreatedAt);
+    DateTimeOffset CreatedAt);
 
 public sealed record CommentResponse(
     Guid Id,
     Guid UserId,
     string UserName,
     string Text,
-    DateTime CreatedAt);
+    DateTimeOffset CreatedAt);
 
 public sealed record ProcurementListItem(
     Guid Id,
@@ -77,8 +77,8 @@ public sealed record ProcurementListItem(
     decimal TotalAmount,
     string Currency,
     string RequesterName,
-    DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
 
 public sealed record DashboardMetrics(
     int TotalRequests,
@@ -108,4 +108,4 @@ public sealed record NotificationResponse(
     string Message,
     Guid? ReferenceId,
     bool IsRead,
-    DateTime CreatedAt);
+    DateTimeOffset CreatedAt);

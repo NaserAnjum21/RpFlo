@@ -102,7 +102,7 @@ public sealed class ProcurementRequest : AuditableEntity
         Status = ProcurementStatus.Submitted;
         Touch();
         AddAudit(requesterId, "Submitted", previousStatus, Status);
-        RaiseDomainEvent(new ProcurementSubmitted(Id, requesterId, DateTime.UtcNow));
+        RaiseDomainEvent(new ProcurementSubmitted(Id, requesterId, DateTimeOffset.UtcNow));
         return this;
     }
 
@@ -115,7 +115,7 @@ public sealed class ProcurementRequest : AuditableEntity
         Status = ProcurementStatus.ManagerApproved;
         Touch();
         AddAudit(approverId, "Manager Approved", previousStatus, Status, comment);
-        RaiseDomainEvent(new ProcurementApprovedByManager(Id, approverId, DateTime.UtcNow));
+        RaiseDomainEvent(new ProcurementApprovedByManager(Id, approverId, DateTimeOffset.UtcNow));
         return this;
     }
 
@@ -128,7 +128,7 @@ public sealed class ProcurementRequest : AuditableEntity
         Status = ProcurementStatus.ManagerRejected;
         Touch();
         AddAudit(reviewerId, "Manager Rejected", previousStatus, Status, reason);
-        RaiseDomainEvent(new ProcurementRejectedByManager(Id, reviewerId, reason, DateTime.UtcNow));
+        RaiseDomainEvent(new ProcurementRejectedByManager(Id, reviewerId, reason, DateTimeOffset.UtcNow));
         return this;
     }
 
@@ -141,7 +141,7 @@ public sealed class ProcurementRequest : AuditableEntity
         Status = ProcurementStatus.FinanceApproved;
         Touch();
         AddAudit(approverId, "Finance Approved", previousStatus, Status, comment);
-        RaiseDomainEvent(new ProcurementApprovedByFinance(Id, approverId, DateTime.UtcNow));
+        RaiseDomainEvent(new ProcurementApprovedByFinance(Id, approverId, DateTimeOffset.UtcNow));
         return this;
     }
 
@@ -154,7 +154,7 @@ public sealed class ProcurementRequest : AuditableEntity
         Status = ProcurementStatus.FinanceRejected;
         Touch();
         AddAudit(reviewerId, "Finance Rejected", previousStatus, Status, reason);
-        RaiseDomainEvent(new ProcurementRejectedByFinance(Id, reviewerId, reason, DateTime.UtcNow));
+        RaiseDomainEvent(new ProcurementRejectedByFinance(Id, reviewerId, reason, DateTimeOffset.UtcNow));
         return this;
     }
 
@@ -168,7 +168,7 @@ public sealed class ProcurementRequest : AuditableEntity
         Status = ProcurementStatus.PurchaseOrderIssued;
         Touch();
         AddAudit(issuerId, "PO Issued", previousStatus, Status, $"PO Number: {PoNumber}");
-        RaiseDomainEvent(new PurchaseOrderIssued(Id, PoNumber, DateTime.UtcNow));
+        RaiseDomainEvent(new PurchaseOrderIssued(Id, PoNumber, DateTimeOffset.UtcNow));
         return this;
     }
 
@@ -184,7 +184,7 @@ public sealed class ProcurementRequest : AuditableEntity
         Status = ProcurementStatus.Draft;
         Touch();
         AddAudit(requesterId, "Revised to Draft", previousStatus, Status);
-        RaiseDomainEvent(new ProcurementRevisedToDraft(Id, requesterId, DateTime.UtcNow));
+        RaiseDomainEvent(new ProcurementRevisedToDraft(Id, requesterId, DateTimeOffset.UtcNow));
         return this;
     }
 
@@ -200,7 +200,7 @@ public sealed class ProcurementRequest : AuditableEntity
         _auditEntries.Add(AuditEntry.Create(Id, userId, action, from, to, comment));
 
     private static string GeneratePoNumber() =>
-        $"PO-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8].ToUpperInvariant()}";
+        $"PO-{DateTimeOffset.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..8].ToUpperInvariant()}";
 
     private static class DomainErrors
     {

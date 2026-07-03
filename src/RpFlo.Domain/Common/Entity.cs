@@ -3,8 +3,8 @@ namespace RpFlo.Domain.Common;
 public abstract class Entity
 {
     public Guid Id { get; protected init; } = Guid.NewGuid();
-    public DateTime CreatedAt { get; protected init; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; protected set; } = DateTime.UtcNow;
+    public DateTimeOffset CreatedAt { get; protected init; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset UpdatedAt { get; protected set; } = DateTimeOffset.UtcNow;
 
     private readonly List<IDomainEvent> _domainEvents = [];
     public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
@@ -14,10 +14,10 @@ public abstract class Entity
 
     public void ClearDomainEvents() => _domainEvents.Clear();
 
-    protected void Touch() => UpdatedAt = DateTime.UtcNow;
+    protected void Touch() => UpdatedAt = DateTimeOffset.UtcNow;
 }
 
 public interface IDomainEvent
 {
-    DateTime OccurredAt { get; }
+    DateTimeOffset OccurredAt { get; }
 }

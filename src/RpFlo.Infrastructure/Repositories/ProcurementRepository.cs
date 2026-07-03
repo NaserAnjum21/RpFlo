@@ -119,7 +119,7 @@ public sealed class NotificationRepository(AppDbContext db) : INotificationRepos
             .Where(n => n.UserId == userId && !n.IsRead)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(n => n.IsRead, true)
-                .SetProperty(n => n.UpdatedAt, DateTime.UtcNow), ct);
+                .SetProperty(n => n.UpdatedAt, DateTimeOffset.UtcNow), ct);
 }
 
 public sealed class UnitOfWork(AppDbContext db) : IUnitOfWork

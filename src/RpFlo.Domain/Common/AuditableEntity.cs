@@ -4,11 +4,11 @@ public abstract class AuditableEntity : Entity
 {
     public Guid? LastModifiedBy { get; protected set; }
 
-    protected new void Touch() => UpdatedAt = DateTime.UtcNow;
+    protected new void Touch() => UpdatedAt = DateTimeOffset.UtcNow;
 
     protected void Touch(Guid modifiedBy)
     {
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTimeOffset.UtcNow;
         LastModifiedBy = modifiedBy;
     }
 }
