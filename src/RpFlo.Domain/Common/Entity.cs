@@ -16,8 +16,3 @@ public abstract class Entity
 
     protected void Touch() => UpdatedAt = DateTimeOffset.UtcNow;
 }
-
-public interface IDomainEvent
-{
-    DateTimeOffset OccurredAt { get; }
-}
