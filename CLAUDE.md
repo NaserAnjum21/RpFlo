@@ -40,7 +40,7 @@ Clean Architecture with four layers. Dependencies point inward: `Api → Applica
 - **Domain** (`src/RpFlo.Domain/`) — Zero dependencies. Entities with encapsulated behavior, `Result<T>` monad for railway-oriented error flow, `Money` value object, domain events. `ProcurementRequest` is the aggregate root and state machine — all workflow transitions enforced here via methods returning `Result<T>`.
 - **Application** (`src/RpFlo.Application/`) — `ProcurementService` orchestrates domain operations. FluentValidation validators. DTOs for API contracts. Repository interfaces (`IProcurementRepository`, `IUserRepository`, etc.) and `IUnitOfWork`.
 - **Infrastructure** (`src/RpFlo.Infrastructure/`) — EF Core code-first with MSSQL. SQL Server temporal tables on mutable entities for automatic change history. Repository implementations. `SeedData` creates demo users (Alice/Bob/Carol/Dave/Eve) on startup. Migrations in `Migrations/`.
-- **Api** (`src/RpFlo.Api/`) — ASP.NET Core controllers. `ErrorHandlingMiddleware` catches `ValidationException` → 400. Controllers map `Result<T>` error codes to HTTP status (`NotFound.*` → 404, `Unauthorized.*` → 403, `Validation.*`/`Domain.*` → 400).
+- **Api** (`src/RpFlo.Api/`) — ASP.NET Core controllers with Swashbuckle Swagger UI at `/swagger` in Development mode. `ErrorHandlingMiddleware` catches `ValidationException` → 400. Controllers map `Result<T>` error codes to HTTP status (`NotFound.*` → 404, `Unauthorized.*` → 403, `Validation.*`/`Domain.*` → 400).
 
 ## Key Patterns
 

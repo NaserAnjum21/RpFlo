@@ -16,7 +16,12 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(connectionString);
 builder.Services.AddControllers()
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-builder.Services.AddOpenApi();
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
+}
 
 builder.Services.AddCors(options =>
 {
@@ -30,7 +35,8 @@ app.UseCors();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
 app.UseMiddleware<RpFlo.Api.Middleware.ErrorHandlingMiddleware>();
