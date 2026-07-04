@@ -19,7 +19,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/hooks/useAuth';
 import { notificationsApi } from '@/api/users';
@@ -135,30 +135,32 @@ export function Layout({ children }: { children: ReactNode }) {
                 )}
               </SheetTrigger>
               <SheetContent>
-                <SheetTitle className="flex items-center justify-between pr-4">
-                  Notifications
-                  {unreadCount > 0 && (
-                    <Button variant="ghost" size="sm" onClick={handleMarkAllRead}>
-                      Mark all read
-                    </Button>
-                  )}
-                </SheetTitle>
-                <ScrollArea className="h-[calc(100vh-8rem)] mt-4">
+                <SheetHeader>
+                  <div className="flex items-center justify-between pr-8">
+                    <SheetTitle>Notifications</SheetTitle>
+                    {unreadCount > 0 && (
+                      <Button variant="ghost" size="sm" onClick={handleMarkAllRead}>
+                        Mark all read
+                      </Button>
+                    )}
+                  </div>
+                </SheetHeader>
+                <ScrollArea className="flex-1 px-4">
                   {notifications.length === 0 ? (
                     <p className="text-muted-foreground text-center py-8">No notifications</p>
                   ) : (
-                    <div className="space-y-2 pr-4">
+                    <div className="space-y-2 pb-4">
                       {notifications.map((n: NotificationResponse) => (
                         <div
                           key={n.id}
-                          className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                          className={`p-4 rounded-lg border cursor-pointer transition-colors ${
                             n.isRead ? 'bg-background' : 'bg-muted'
                           }`}
                           onClick={() => !n.isRead && handleMarkRead(n.id)}
                         >
                           <p className="font-medium text-sm">{n.title}</p>
                           <p className="text-sm text-muted-foreground mt-1">{n.message}</p>
-                          <p className="text-xs text-muted-foreground mt-1">
+                          <p className="text-xs text-muted-foreground mt-2">
                             {formatDateTime(n.createdAt)}
                           </p>
                         </div>

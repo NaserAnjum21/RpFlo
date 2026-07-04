@@ -14,7 +14,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -284,7 +283,7 @@ export function RequestDetail() {
               <Input
                 value={editTitle}
                 onChange={e => setEditTitle(e.target.value)}
-                className="text-2xl font-bold h-auto py-1"
+                className="text-2xl font-bold h-10 flex-1 max-w-md"
               />
             ) : (
               <h1 className="text-2xl font-bold">{request.title}</h1>
@@ -379,10 +378,16 @@ export function RequestDetail() {
             <CardContent>
               {isEditing ? (
                 <div className="space-y-3">
+                  <div className="flex gap-3 items-center text-xs text-muted-foreground">
+                    <div className="flex-1">Item Name</div>
+                    <div className="w-24">Qty</div>
+                    <div className="w-32">Unit Price</div>
+                    <div className="w-24 text-right">Total</div>
+                    <div className="w-9" />
+                  </div>
                   {editLineItems.map((item, index) => (
-                    <div key={item.originalId ?? `new-${index}`} className="flex gap-3 items-start">
+                    <div key={item.originalId ?? `new-${index}`} className="flex gap-3 items-center">
                       <div className="flex-1">
-                        {index === 0 && <Label className="text-xs text-muted-foreground">Item Name</Label>}
                         <Input
                           placeholder="Item name"
                           value={item.name}
@@ -390,7 +395,6 @@ export function RequestDetail() {
                         />
                       </div>
                       <div className="w-24">
-                        {index === 0 && <Label className="text-xs text-muted-foreground">Qty</Label>}
                         <Input
                           type="number"
                           placeholder="Qty"
@@ -400,7 +404,6 @@ export function RequestDetail() {
                         />
                       </div>
                       <div className="w-32">
-                        {index === 0 && <Label className="text-xs text-muted-foreground">Unit Price</Label>}
                         <Input
                           type="number"
                           placeholder="Price"
@@ -410,22 +413,19 @@ export function RequestDetail() {
                           step="0.01"
                         />
                       </div>
-                      <div className="w-24 text-right pt-2 text-sm font-medium">
-                        {index === 0 && <Label className="text-xs text-muted-foreground block">&nbsp;</Label>}
+                      <div className="w-24 text-right text-sm font-medium">
                         ${((parseInt(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)).toFixed(2)}
                       </div>
-                      <div>
-                        {index === 0 && <Label className="text-xs text-muted-foreground block">&nbsp;</Label>}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeEditLineItem(index)}
-                          disabled={editLineItems.length <= 1}
-                        >
-                          <Trash2 className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeEditLineItem(index)}
+                        disabled={editLineItems.length <= 1}
+                        className="shrink-0"
+                      >
+                        <Trash2 className="h-4 w-4 text-muted-foreground" />
+                      </Button>
                     </div>
                   ))}
                   <div className="flex justify-end pt-2 border-t">
