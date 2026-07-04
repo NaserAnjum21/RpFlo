@@ -9,10 +9,11 @@ public interface IProcurementRepository
     Task<ProcurementRequest?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<IReadOnlyList<ProcurementRequest>> GetAllAsync(CancellationToken ct = default);
     Task<IReadOnlyList<ProcurementRequest>> GetVisibleForUserAsync(Guid userId, UserRole role, CancellationToken ct = default);
-    Task<PagedResult<ProcurementRequest>> GetPagedAsync(ProcurementListPageQuery query, CancellationToken ct = default);
-    Task<PagedResult<ProcurementRequest>> GetPagedVisibleForUserAsync(Guid userId, UserRole role, ProcurementListPageQuery query, CancellationToken ct = default);
-    Task<PagedResult<ProcurementRequest>> GetPagedByRequesterIdAsync(Guid requesterId, ProcurementListPageQuery query, CancellationToken ct = default);
-    Task<PagedResult<ProcurementRequest>> GetPagedPendingForUserAsync(Guid userId, UserRole role, ProcurementTaskPageQuery query, CancellationToken ct = default);
+    Task<IReadOnlyList<ProcurementListItem>> GetVisibleListItemsForUserAsync(Guid userId, UserRole role, CancellationToken ct = default);
+    Task<PagedResult<ProcurementListItem>> GetPagedAsync(ProcurementListPageQuery query, CancellationToken ct = default);
+    Task<PagedResult<ProcurementListItem>> GetPagedVisibleForUserAsync(Guid userId, UserRole role, ProcurementListPageQuery query, CancellationToken ct = default);
+    Task<PagedResult<ProcurementListItem>> GetPagedByRequesterIdAsync(Guid requesterId, ProcurementListPageQuery query, CancellationToken ct = default);
+    Task<PagedResult<ProcurementListItem>> GetPagedPendingForUserAsync(Guid userId, UserRole role, ProcurementTaskPageQuery query, CancellationToken ct = default);
     Task<IReadOnlyList<ProcurementRequest>> GetByDepartmentAsync(Department department, CancellationToken ct = default);
     Task<ProcurementRequest> AddAsync(ProcurementRequest request, CancellationToken ct = default);
     Task UpdateAsync(ProcurementRequest request, CancellationToken ct = default);

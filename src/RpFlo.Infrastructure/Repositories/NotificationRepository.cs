@@ -10,6 +10,7 @@ public sealed class NotificationRepository(AppDbContext db) : INotificationRepos
     public async Task<IReadOnlyList<Notification>> GetByUserIdAsync(
         Guid userId, CancellationToken ct = default) =>
         await db.Notifications
+            .AsNoTracking()
             .Where(n => n.UserId == userId)
             .OrderByDescending(n => n.CreatedAt)
             .ToListAsync(ct);

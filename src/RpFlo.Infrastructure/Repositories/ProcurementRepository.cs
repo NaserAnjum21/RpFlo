@@ -14,24 +14,35 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
             .Include(p => p.LineItems)
             .Include(p => p.AuditEntries)
             .Include(p => p.Comments)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == id, ct);
 
     public async Task<IReadOnlyList<ProcurementRequest>> GetAllAsync(CancellationToken ct = default) =>
         await db.ProcurementRequests
+            .AsNoTracking()
             .Include(p => p.LineItems)
             .Include(p => p.AuditEntries)
+            .AsSplitQuery()
             .OrderByDescending(p => p.CreatedAt)
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<ProcurementRequest>> GetVisibleForUserAsync(
         Guid userId, UserRole role, CancellationToken ct = default) =>
-        await ApplyVisibilityFilter(db.ProcurementRequests, userId, role)
+        await ApplyVisibilityFilter(db.ProcurementRequests.AsNoTracking(), userId, role)
             .Include(p => p.LineItems)
             .Include(p => p.AuditEntries)
+            .AsSplitQuery()
             .OrderByDescending(p => p.CreatedAt)
             .ToListAsync(ct);
 
-    public async Task<PagedResult<ProcurementRequest>> GetPagedAsync(
+    public async Task<IReadOnlyList<ProcurementListItem>> GetVisibleListItemsForUserAsync(
+        Guid userId, UserRole role, CancellationToken ct = default) =>
+        await ToListItemsAsync(
+            ApplyVisibilityFilter(db.ProcurementRequests.AsNoTracking(), userId, role)
+                .OrderByDescending(p => p.CreatedAt),
+            ct);
+
+    public async Task<PagedResult<ProcurementListItem>> GetPagedAsync(
         ProcurementListPageQuery query, CancellationToken ct = default) =>
         await ToPagedResultAsync(
             ApplyListFilters(db.ProcurementRequests.AsNoTracking(), query),
@@ -40,7 +51,7 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
             q => q.OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Id),
             ct);
 
-    public async Task<PagedResult<ProcurementRequest>> GetPagedVisibleForUserAsync(
+    public async Task<PagedResult<ProcurementListItem>> GetPagedVisibleForUserAsync(
         Guid userId, UserRole role, ProcurementListPageQuery query, CancellationToken ct = default) =>
         await ToPagedResultAsync(
             ApplyListFilters(ApplyVisibilityFilter(db.ProcurementRequests.AsNoTracking(), userId, role), query),
@@ -49,7 +60,7 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
             q => q.OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Id),
             ct);
 
-    public async Task<PagedResult<ProcurementRequest>> GetPagedByRequesterIdAsync(
+    public async Task<PagedResult<ProcurementListItem>> GetPagedByRequesterIdAsync(
         Guid requesterId, ProcurementListPageQuery query, CancellationToken ct = default) =>
         await ToPagedResultAsync(
             ApplyListFilters(db.ProcurementRequests.AsNoTracking().Where(p => p.RequesterId == requesterId), query),
@@ -58,7 +69,7 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
             q => q.OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Id),
             ct);
 
-    public async Task<PagedResult<ProcurementRequest>> GetPagedPendingForUserAsync(
+    public async Task<PagedResult<ProcurementListItem>> GetPagedPendingForUserAsync(
         Guid userId, UserRole role, ProcurementTaskPageQuery query, CancellationToken ct = default)
     {
         var procurements = db.ProcurementRequests.AsNoTracking();
@@ -97,6 +108,7 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
     public async Task<IReadOnlyList<ProcurementRequest>> GetByDepartmentAsync(
         Department department, CancellationToken ct = default) =>
         await db.ProcurementRequests
+            .AsNoTracking()
             .Include(p => p.LineItems)
             .Where(p => p.Department == department)
             .OrderByDescending(p => p.CreatedAt)
@@ -211,73 +223,79 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
 
     private async Task<RoleMetrics> ComputeRoleMetrics(Guid userId, UserRole role, CancellationToken ct)
     {
-        var user = await db.Users.FindAsync([userId], ct);
-        if (user is null)
-            return new RoleMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, [], []);
-
-        role = user.Role;
         var monthStart = new DateTimeOffset(DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
 
-        var myActive = await db.ProcurementRequests
-            .CountAsync(p => p.RequesterId == userId &&
-                p.Status != ProcurementStatus.PurchaseOrderIssued &&
-                p.Status != ProcurementStatus.ManagerRejected &&
-                p.Status != ProcurementStatus.FinanceRejected, ct);
+        var userRequests = db.ProcurementRequests.AsNoTracking()
+            .Where(p => p.RequesterId == userId);
 
-        var myPending = await db.ProcurementRequests
-            .CountAsync(p => p.RequesterId == userId &&
-                (p.Status == ProcurementStatus.Submitted || p.Status == ProcurementStatus.ManagerApproved), ct);
+        var myStatusCounts = await userRequests
+            .GroupBy(p => p.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
 
-        var myApproved = await db.ProcurementRequests
-            .Where(p => p.RequesterId == userId &&
-                (p.Status == ProcurementStatus.FinanceApproved || p.Status == ProcurementStatus.PurchaseOrderIssued))
+        var myCounts = myStatusCounts.ToDictionary(s => s.Status, s => s.Count);
+        int MyCount(params ProcurementStatus[] statuses) =>
+            statuses.Sum(s => myCounts.GetValueOrDefault(s));
+
+        var myActive = myCounts.Values.Sum() -
+            MyCount(ProcurementStatus.PurchaseOrderIssued, ProcurementStatus.ManagerRejected, ProcurementStatus.FinanceRejected);
+
+        var myPending = MyCount(ProcurementStatus.Submitted, ProcurementStatus.ManagerApproved);
+
+        var myApproved = await userRequests
+            .Where(p => p.Status == ProcurementStatus.FinanceApproved || p.Status == ProcurementStatus.PurchaseOrderIssued)
             .SelectMany(p => p.LineItems)
             .SumAsync(li => (decimal?)li.UnitPrice.Amount * li.Quantity, ct) ?? 0;
 
-        var myAvgHours = await db.ProcurementRequests
-            .Where(p => p.RequesterId == userId && p.Status == ProcurementStatus.PurchaseOrderIssued)
+        var myAvgHours = await userRequests
+            .Where(p => p.Status == ProcurementStatus.PurchaseOrderIssued)
             .Select(p => (double?)EF.Functions.DateDiffSecond(p.CreatedAt, p.UpdatedAt))
             .AverageAsync(ct) ?? 0;
 
+        var workflowCounts = role is UserRole.Manager or UserRole.Finance or UserRole.Admin
+            ? await db.ProcurementRequests.AsNoTracking()
+                .Where(p =>
+                    p.Status == ProcurementStatus.Submitted ||
+                    p.Status == ProcurementStatus.ManagerApproved ||
+                    p.Status == ProcurementStatus.FinanceApproved)
+                .GroupBy(p => p.Status)
+                .Select(g => new { Status = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(g => g.Status, g => g.Count, ct)
+            : new Dictionary<ProcurementStatus, int>();
+
         var pendingManagerReview = role is UserRole.Manager or UserRole.Admin
-            ? await db.ProcurementRequests.CountAsync(p => p.Status == ProcurementStatus.Submitted, ct)
+            ? workflowCounts.GetValueOrDefault(ProcurementStatus.Submitted)
             : 0;
 
         var pendingFinanceReview = role is UserRole.Finance or UserRole.Admin
-            ? await db.ProcurementRequests.CountAsync(p => p.Status == ProcurementStatus.ManagerApproved, ct)
+            ? workflowCounts.GetValueOrDefault(ProcurementStatus.ManagerApproved)
             : 0;
 
         var approvedThisMonth = role is UserRole.Manager or UserRole.Finance or UserRole.Admin
-            ? await db.ProcurementRequests.CountAsync(p => p.Status == ProcurementStatus.PurchaseOrderIssued && p.UpdatedAt >= monthStart, ct)
+            ? await db.ProcurementRequests.AsNoTracking()
+                .CountAsync(p => p.Status == ProcurementStatus.PurchaseOrderIssued && p.UpdatedAt >= monthStart, ct)
             : 0;
 
         var readyForPo = role is UserRole.Finance or UserRole.Admin
-            ? await db.ProcurementRequests.CountAsync(p => p.Status == ProcurementStatus.FinanceApproved, ct)
+            ? workflowCounts.GetValueOrDefault(ProcurementStatus.FinanceApproved)
             : 0;
 
         var pendingFinanceStatuses = new[] { ProcurementStatus.ManagerApproved, ProcurementStatus.FinanceApproved };
         var totalValuePending = role is UserRole.Finance or UserRole.Admin
-            ? await db.ProcurementRequests
+            ? await db.ProcurementRequests.AsNoTracking()
                 .Where(p => pendingFinanceStatuses.Contains(p.Status))
                 .SelectMany(p => p.LineItems)
                 .SumAsync(li => (decimal?)li.UnitPrice.Amount * li.Quantity, ct) ?? 0
             : 0;
 
         var monthlySpend = role is UserRole.Finance or UserRole.Admin
-            ? await db.ProcurementRequests
+            ? await db.ProcurementRequests.AsNoTracking()
                 .Where(p => p.Status == ProcurementStatus.PurchaseOrderIssued && p.UpdatedAt >= monthStart)
                 .SelectMany(p => p.LineItems)
                 .SumAsync(li => (decimal?)li.UnitPrice.Amount * li.Quantity, ct) ?? 0
             : 0;
 
-        var myStatusCounts = await db.ProcurementRequests
-            .Where(p => p.RequesterId == userId)
-            .GroupBy(p => p.Status)
-            .Select(g => new StatusCount(g.Key.ToString(), g.Count()))
-            .ToListAsync(ct);
-
-        var myDeptCounts = await db.ProcurementRequests
-            .Where(p => p.RequesterId == userId)
+        var myDeptCounts = await userRequests
             .GroupBy(p => p.Department)
             .Select(g => new DepartmentCount(
                 g.Key.ToString(),
@@ -295,7 +313,7 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
             ReadyForPo: readyForPo,
             TotalValuePending: totalValuePending,
             MonthlySpendApproved: monthlySpend,
-            MyStatusBreakdown: myStatusCounts,
+            MyStatusBreakdown: myStatusCounts.Select(s => new StatusCount(s.Status.ToString(), s.Count)).ToList(),
             MyDepartmentBreakdown: myDeptCounts);
     }
 
@@ -341,7 +359,7 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
     private static DateTimeOffset ToUtcStart(DateOnly date) =>
         new(date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc), TimeSpan.Zero);
 
-    private static async Task<PagedResult<ProcurementRequest>> ToPagedResultAsync(
+    private async Task<PagedResult<ProcurementListItem>> ToPagedResultAsync(
         IQueryable<ProcurementRequest> query,
         int requestedPage,
         int requestedPageSize,
@@ -353,12 +371,58 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalItems / (double)pageSize));
         var page = Math.Clamp(requestedPage, 1, totalPages);
 
-        var items = await orderBy(query)
-            .Include(p => p.LineItems)
+        var items = await ToListItemsAsync(orderBy(query)
             .Skip((page - 1) * pageSize)
-            .Take(pageSize)
+            .Take(pageSize), ct);
+
+        return new PagedResult<ProcurementListItem>(items, page, pageSize, totalItems, totalPages);
+    }
+
+    private async Task<List<ProcurementListItem>> ToListItemsAsync(
+        IQueryable<ProcurementRequest> query,
+        CancellationToken ct)
+    {
+        var rows = await (
+            from p in query
+            join requester in db.Users.AsNoTracking()
+                on p.RequesterId equals requester.Id into requesters
+            from requester in requesters.DefaultIfEmpty()
+            select new ProcurementListItemRow(
+                p.Id,
+                p.Title,
+                p.Department,
+                p.Urgency,
+                p.Status,
+                p.LineItems.Sum(li => (decimal?)(li.UnitPrice.Amount * li.Quantity)) ?? 0m,
+                p.LineItems.Select(li => li.UnitPrice.Currency).FirstOrDefault() ?? "USD",
+                requester == null ? "Unknown" : requester.Name,
+                p.CreatedAt,
+                p.UpdatedAt))
             .ToListAsync(ct);
 
-        return new PagedResult<ProcurementRequest>(items, page, pageSize, totalItems, totalPages);
+        return rows.Select(row => new ProcurementListItem(
+                row.Id,
+                row.Title,
+                row.Department.ToString(),
+                row.Urgency.ToString(),
+                row.Status.ToString(),
+                row.TotalAmount,
+                row.Currency,
+                row.RequesterName,
+                row.CreatedAt,
+                row.UpdatedAt))
+            .ToList();
     }
+
+    private sealed record ProcurementListItemRow(
+        Guid Id,
+        string Title,
+        Department Department,
+        Urgency Urgency,
+        ProcurementStatus Status,
+        decimal TotalAmount,
+        string Currency,
+        string RequesterName,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset UpdatedAt);
 }

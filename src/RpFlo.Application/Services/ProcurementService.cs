@@ -68,16 +68,8 @@ public sealed class ProcurementService(
         if (userResult.IsFailure) return userResult.Error;
         var user = userResult.Value;
 
-        var procurements = await procurementRepo.GetVisibleForUserAsync(user.Id, user.Role, ct);
-        var requesterIds = procurements.Select(p => p.RequesterId).Distinct().ToList();
-        var requesters = requesterIds.Count == 0
-            ? []
-            : await userRepo.GetByIdsAsync(requesterIds, ct);
-        var userMap = requesters.ToDictionary(u => u.Id);
-
-        return procurements
-            .Select(p => MapToListItem(p, userMap.GetValueOrDefault(p.RequesterId)))
-            .ToList();
+        var items = await procurementRepo.GetVisibleListItemsForUserAsync(user.Id, user.Role, ct);
+        return Result<IReadOnlyList<ProcurementListItem>>.Success(items);
     }
 
     public async Task<Result<PagedResult<ProcurementListItem>>> GetPagedVisibleForUserAsync(
@@ -88,8 +80,7 @@ public sealed class ProcurementService(
         if (userResult.IsFailure) return userResult.Error;
         var user = userResult.Value;
 
-        var page = await procurementRepo.GetPagedVisibleForUserAsync(user.Id, user.Role, query, ct);
-        return await MapPagedListItemsAsync(page, ct);
+        return await procurementRepo.GetPagedVisibleForUserAsync(user.Id, user.Role, query, ct);
     }
 
     public async Task<Result<PagedResult<ProcurementListItem>>> GetPagedByRequesterAsync(
@@ -98,8 +89,7 @@ public sealed class ProcurementService(
         var userResult = await GetUserOrError(requesterId, ct);
         if (userResult.IsFailure) return userResult.Error;
 
-        var page = await procurementRepo.GetPagedByRequesterIdAsync(requesterId, query, ct);
-        return await MapPagedListItemsAsync(page, ct);
+        return await procurementRepo.GetPagedByRequesterIdAsync(requesterId, query, ct);
     }
 
     public async Task<Result<PagedResult<ProcurementListItem>>> GetPagedPendingForUserAsync(
@@ -109,8 +99,7 @@ public sealed class ProcurementService(
         if (user is null)
             return Error.NotFound("User", "User not found.");
 
-        var page = await procurementRepo.GetPagedPendingForUserAsync(userId, user.Role, query, ct);
-        return await MapPagedListItemsAsync(page, ct);
+        return await procurementRepo.GetPagedPendingForUserAsync(userId, user.Role, query, ct);
     }
 
     public async Task<Result<ProcurementResponse>> UpdateAsync(
@@ -427,29 +416,6 @@ public sealed class ProcurementService(
                 c.Id, c.UserId, userLookup.GetValueOrDefault(c.UserId, "Unknown"), c.Text, c.CreatedAt)).ToList(),
             p.CreatedAt,
             p.UpdatedAt);
-    }
-
-    private static ProcurementListItem MapToListItem(ProcurementRequest p, User? requester) =>
-        new(p.Id, p.Title, p.Department.ToString(), p.Urgency.ToString(), p.Status.ToString(),
-            p.TotalAmount.Amount, p.TotalAmount.Currency,
-            requester?.Name ?? "Unknown", p.CreatedAt, p.UpdatedAt);
-
-    private async Task<PagedResult<ProcurementListItem>> MapPagedListItemsAsync(
-        PagedResult<ProcurementRequest> page,
-        CancellationToken ct)
-    {
-        var requesterIds = page.Items.Select(p => p.RequesterId).Distinct().ToList();
-        IReadOnlyList<User> requesters = requesterIds.Count == 0
-            ? []
-            : await userRepo.GetByIdsAsync(requesterIds, ct);
-        var requesterMap = requesters.ToDictionary(u => u.Id);
-
-        return new PagedResult<ProcurementListItem>(
-            page.Items.Select(p => MapToListItem(p, requesterMap.GetValueOrDefault(p.RequesterId))).ToList(),
-            page.Page,
-            page.PageSize,
-            page.TotalItems,
-            page.TotalPages);
     }
 
     private async Task NotifyUsersWithRole(

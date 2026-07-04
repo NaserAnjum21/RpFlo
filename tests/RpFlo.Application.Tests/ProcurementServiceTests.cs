@@ -99,14 +99,27 @@ public class ProcurementServiceTests
         var requester = CreateUser("Alice Requester", UserRole.Requester);
         var procurement = CreateDraftWithItem(requester.Id);
         var query = new ProcurementListPageQuery();
-        var page = new PagedResult<ProcurementRequest>([procurement], 1, 10, 1, 1);
+        var page = new PagedResult<ProcurementListItem>(
+            [new ProcurementListItem(
+                procurement.Id,
+                procurement.Title,
+                procurement.Department.ToString(),
+                procurement.Urgency.ToString(),
+                procurement.Status.ToString(),
+                procurement.TotalAmount.Amount,
+                procurement.TotalAmount.Currency,
+                requester.Name,
+                procurement.CreatedAt,
+                procurement.UpdatedAt)],
+            1,
+            10,
+            1,
+            1);
 
         _userRepo.GetByIdAsync(requester.Id, Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<User?>(requester));
         _procurementRepo.GetPagedVisibleForUserAsync(requester.Id, requester.Role, query, Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(page));
-        _userRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
-            .Returns(Task.FromResult<IReadOnlyList<User>>(new List<User> { requester }));
 
         var result = await _service.GetPagedVisibleForUserAsync(requester.Id, query);
 
