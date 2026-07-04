@@ -18,10 +18,9 @@ const APPROVALS_PAGE_SIZE = 100;
 export function Approvals({ role }: { role: 'Manager' | 'Finance' }) {
   const { data, isLoading } = useQuery({
     queryKey: ['procurement', 'approvals', role],
-    queryFn: () => procurementApi.getAll({
+    queryFn: () => procurementApi.getPending({
       page: 1,
       pageSize: APPROVALS_PAGE_SIZE,
-      filter: 'pending',
     }),
   });
 

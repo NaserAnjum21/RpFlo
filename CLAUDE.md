@@ -52,7 +52,7 @@ Clean Architecture with four layers. Dependencies point inward: `Api → Applica
 
 **State machine in entity** — `ProcurementRequest` enforces: `Draft → Submitted → ManagerApproved → FinanceApproved → PurchaseOrderIssued`. Rejections branch to `ManagerRejected`/`FinanceRejected`, which can `ReviseToDraft`. Invalid transitions return domain errors.
 
-**Simulated auth** — `X-User-Id` header, no real auth. Frontend sets it via `setCurrentUser()` in `api/client.ts`. User-switcher dropdown in layout.
+**Simulated auth** — `X-User-Id` header, no real auth. Frontend sets it via `setCurrentUser()` in `api/client.ts`. User-switcher dropdown in layout. Procurement API reads are server-scoped by the caller: requesters can only view their own requests, managers can view non-draft workflow requests plus their own, finance can view finance-stage requests plus their own, and admins can view all. Keep list/detail/export/metrics endpoints on the scoped service methods.
 
 **EF Core quirk** — New child entities (AuditEntry, Comment) added through domain methods need explicit `DbContext.Add()` in `UpdateAsync` because EF Core doesn't auto-detect new entities with Guid keys in DDD-style encapsulated collections.
 

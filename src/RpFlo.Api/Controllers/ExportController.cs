@@ -9,9 +9,20 @@ namespace RpFlo.Api.Controllers;
 public sealed class ExportController(ProcurementService service) : ControllerBase
 {
     [HttpGet("csv")]
-    public async Task<IActionResult> ExportCsv(CancellationToken ct)
+    public async Task<IActionResult> ExportCsv(
+        [FromHeader(Name = "X-User-Id")] Guid userId,
+        CancellationToken ct)
     {
-        var items = await service.GetAllAsync(ct);
+        var result = await service.GetAllVisibleForUserAsync(userId, ct);
+        if (result.IsFailure)
+            return result.Error.Code switch
+            {
+                var c when c.StartsWith("NotFound") => NotFound(new { result.Error.Code, result.Error.Message }),
+                var c when c.StartsWith("Unauthorized") => StatusCode(403, new { result.Error.Code, result.Error.Message }),
+                _ => BadRequest(new { result.Error.Code, result.Error.Message })
+            };
+
+        var items = result.Value;
 
         var sb = new StringBuilder();
         sb.AppendLine("Id,Title,Department,Urgency,Status,TotalAmount,Currency,Requester,CreatedAt,UpdatedAt");

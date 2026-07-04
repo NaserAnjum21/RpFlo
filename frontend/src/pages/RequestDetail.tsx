@@ -82,6 +82,11 @@ function getErrorMessage(error: unknown): string {
   return fallback;
 }
 
+function getResponseStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object' || !('response' in error)) return undefined;
+  return (error as { response?: { status?: number } }).response?.status;
+}
+
 export function RequestDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -100,10 +105,14 @@ export function RequestDetail() {
   const [actionError, setActionError] = useState('');
   const [needsReviseToDraft, setNeedsReviseToDraft] = useState(false);
 
-  const { data: request, isLoading } = useQuery({
+  const { data: request, error, isError, isLoading } = useQuery({
     queryKey: ['procurement', id],
     queryFn: () => procurementApi.getById(id!),
     enabled: !!id,
+    retry: (failureCount, queryError) => {
+      const status = getResponseStatus(queryError);
+      return status !== 403 && status !== 404 && failureCount < 1;
+    },
   });
 
   const invalidate = () => {
@@ -164,8 +173,54 @@ export function RequestDetail() {
     onError: handleMutationError,
   });
 
-  if (isLoading || !request) {
+  const handleExportPdf = () => {
+    // Use the API client so the simulated auth header is sent with the download request.
+    procurementApi.exportPdf(id!);
+  };
+
+  if (isLoading) {
     return <DetailSkeleton />;
+  }
+
+  if (isError || !request) {
+    const status = getResponseStatus(error);
+    const isForbidden = status === 403;
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/requests')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">
+              {isForbidden ? 'Access denied' : 'Request unavailable'}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              {isForbidden
+                ? 'You do not have permission to view this procurement request.'
+                : getErrorMessage(error)}
+            </p>
+          </div>
+        </div>
+
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="py-4 flex items-start gap-3 text-red-800">
+            <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
+            <div className="space-y-3">
+              <p className="text-sm">
+                {isForbidden
+                  ? 'This request may belong to another requester or sit outside your workflow scope.'
+                  : 'The request could not be loaded.'}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => navigate('/requests')}>
+                Back to requests
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   const isOwner = currentUser?.id === request.requester.id;
@@ -344,7 +399,7 @@ export function RequestDetail() {
               variant="outline"
               size="sm"
               className="gap-2 border-green-300 text-green-700 hover:bg-green-100"
-              onClick={() => window.open(`/api/procurement/${id}/export/pdf`, '_blank')}
+              onClick={handleExportPdf}
             >
               <FileDown className="h-4 w-4" />
               Export PDF

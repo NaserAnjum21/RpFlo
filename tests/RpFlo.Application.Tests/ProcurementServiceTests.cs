@@ -94,6 +94,108 @@ public class ProcurementServiceTests
     }
 
     [Fact]
+    public async Task GetPagedVisibleForUserAsync_Requester_UsesRoleScopedRepository()
+    {
+        var requester = CreateUser("Alice Requester", UserRole.Requester);
+        var procurement = CreateDraftWithItem(requester.Id);
+        var query = new ProcurementListPageQuery();
+        var page = new PagedResult<ProcurementRequest>([procurement], 1, 10, 1, 1);
+
+        _userRepo.GetByIdAsync(requester.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<User?>(requester));
+        _procurementRepo.GetPagedVisibleForUserAsync(requester.Id, requester.Role, query, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(page));
+        _userRepo.GetByIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<User>>(new List<User> { requester }));
+
+        var result = await _service.GetPagedVisibleForUserAsync(requester.Id, query);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Items.Should().ContainSingle(item =>
+            item.Id == procurement.Id &&
+            item.RequesterName == requester.Name);
+        await _procurementRepo.Received(1)
+            .GetPagedVisibleForUserAsync(requester.Id, requester.Role, query, Arg.Any<CancellationToken>());
+        await _procurementRepo.DidNotReceive()
+            .GetPagedAsync(Arg.Any<ProcurementListPageQuery>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetByIdForUserAsync_RequesterAccessingAnotherRequesterRequest_ReturnsUnauthorized()
+    {
+        var requester = CreateUser("Alice Requester", UserRole.Requester);
+        var otherRequester = CreateUser("Bob Requester", UserRole.Requester);
+        var procurement = CreateSubmittedRequest(otherRequester.Id);
+
+        _userRepo.GetByIdAsync(requester.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<User?>(requester));
+        _procurementRepo.GetByIdAsync(procurement.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<ProcurementRequest?>(procurement));
+
+        var result = await _service.GetByIdForUserAsync(procurement.Id, requester.Id);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Unauthorized.AccessDenied");
+        await _userRepo.DidNotReceive()
+            .GetByIdAsync(otherRequester.Id, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AddCommentAsync_RequesterAccessingAnotherRequesterRequest_ReturnsUnauthorizedAndDoesNotPersist()
+    {
+        var requester = CreateUser("Alice Requester", UserRole.Requester);
+        var otherRequester = CreateUser("Bob Requester", UserRole.Requester);
+        var procurement = CreateSubmittedRequest(otherRequester.Id);
+
+        _userRepo.GetByIdAsync(requester.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<User?>(requester));
+        _procurementRepo.GetByIdAsync(procurement.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<ProcurementRequest?>(procurement));
+
+        var result = await _service.AddCommentAsync(
+            procurement.Id,
+            requester.Id,
+            new AddCommentRequest("Peeking at this should not be allowed"));
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Unauthorized.AccessDenied");
+        procurement.Comments.Should().BeEmpty();
+        await _procurementRepo.DidNotReceive()
+            .UpdateAsync(Arg.Any<ProcurementRequest>(), Arg.Any<CancellationToken>());
+        await _unitOfWork.DidNotReceive()
+            .SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetMetricsForUserAsync_Requester_PassesRequesterRoleToRepository()
+    {
+        var requester = CreateUser("Alice Requester", UserRole.Requester);
+        var metrics = new DashboardMetrics(
+            TotalRequests: 1,
+            DraftCount: 1,
+            PendingApprovalCount: 0,
+            ApprovedCount: 0,
+            RejectedCount: 0,
+            PurchaseOrderCount: 0,
+            TotalApprovedAmount: 0,
+            AverageProcessingTimeHours: 0,
+            StatusBreakdown: [new StatusCount("Draft", 1)],
+            DepartmentBreakdown: [new DepartmentCount("Engineering", 1, 5000m)]);
+
+        _userRepo.GetByIdAsync(requester.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<User?>(requester));
+        _procurementRepo.GetMetricsAsync(requester.Id, requester.Role, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(metrics));
+
+        var result = await _service.GetMetricsForUserAsync(requester.Id);
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.TotalRequests.Should().Be(1);
+        await _procurementRepo.Received(1)
+            .GetMetricsAsync(requester.Id, UserRole.Requester, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ApproveByManagerAsync_NonManager_ReturnsUnauthorizedAndDoesNotPersist()
     {
         var requester = CreateUser("Alice Requester", UserRole.Requester);

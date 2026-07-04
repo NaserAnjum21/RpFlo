@@ -11,7 +11,7 @@ Record of key architectural and trade-off decisions for RpFlo. Newest entries fi
 
 **Context:** Requests and My Tasks pages were fetching full request queues, then filtering and paginating in React. That worked for seed data but would over-fetch and produce inaccurate page boundaries as data grows.
 
-**Decision:** Make procurement list API endpoints return paged results for request lists and actionable task queues. Server-side queries apply date/status/task filters, count matching rows, sort deterministically, and then page with SQL `Skip`/`Take`. Export uses a separate internal full-list service path because it needs the complete dataset.
+**Decision:** Make procurement list API endpoints return paged results for request lists and actionable task queues. Server-side queries apply date/status/task filters, count matching rows, sort deterministically, and then page with SQL `Skip`/`Take`. Exports use a scoped full-list service path because they need the complete dataset visible to the caller.
 
 **Trade-offs:**
 - (+) Page changes fetch only the rows needed for the current view

@@ -17,6 +17,7 @@ export function Dashboard() {
   const { data: metrics, isLoading } = useQuery({
     queryKey: ['metrics', currentUser?.id],
     queryFn: procurementApi.getMetrics,
+    enabled: !!currentUser,
   });
 
   if (isLoading || !metrics) {

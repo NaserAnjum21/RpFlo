@@ -40,37 +40,64 @@ public sealed class ProcurementService(
         return await MapToResponseAsync(procurement, user, ct);
     }
 
-    public async Task<Result<ProcurementResponse>> GetByIdAsync(Guid id, CancellationToken ct = default)
+    public async Task<Result<ProcurementResponse>> GetByIdForUserAsync(
+        Guid id,
+        Guid userId,
+        CancellationToken ct = default)
     {
+        var userResult = await GetUserOrError(userId, ct);
+        if (userResult.IsFailure) return userResult.Error;
+        var user = userResult.Value;
+
         var procurement = await procurementRepo.GetByIdAsync(id, ct);
         if (procurement is null)
             return Error.NotFound("Procurement", $"Procurement request {id} not found.");
+
+        if (!CanView(user, procurement))
+            return Error.Unauthorized("AccessDenied", "You do not have access to this procurement request.");
 
         var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
         return await MapToResponseAsync(procurement, requester!, ct);
     }
 
-    public async Task<IReadOnlyList<ProcurementListItem>> GetAllAsync(CancellationToken ct = default)
+    public async Task<Result<IReadOnlyList<ProcurementListItem>>> GetAllVisibleForUserAsync(
+        Guid userId,
+        CancellationToken ct = default)
     {
-        var procurements = await procurementRepo.GetAllAsync(ct);
-        var users = await userRepo.GetAllAsync(ct);
-        var userMap = users.ToDictionary(u => u.Id);
+        var userResult = await GetUserOrError(userId, ct);
+        if (userResult.IsFailure) return userResult.Error;
+        var user = userResult.Value;
+
+        var procurements = await procurementRepo.GetVisibleForUserAsync(user.Id, user.Role, ct);
+        var requesterIds = procurements.Select(p => p.RequesterId).Distinct().ToList();
+        var requesters = requesterIds.Count == 0
+            ? []
+            : await userRepo.GetByIdsAsync(requesterIds, ct);
+        var userMap = requesters.ToDictionary(u => u.Id);
 
         return procurements
             .Select(p => MapToListItem(p, userMap.GetValueOrDefault(p.RequesterId)))
             .ToList();
     }
 
-    public async Task<PagedResult<ProcurementListItem>> GetPagedAsync(
+    public async Task<Result<PagedResult<ProcurementListItem>>> GetPagedVisibleForUserAsync(
+        Guid userId,
         ProcurementListPageQuery query, CancellationToken ct = default)
     {
-        var page = await procurementRepo.GetPagedAsync(query, ct);
+        var userResult = await GetUserOrError(userId, ct);
+        if (userResult.IsFailure) return userResult.Error;
+        var user = userResult.Value;
+
+        var page = await procurementRepo.GetPagedVisibleForUserAsync(user.Id, user.Role, query, ct);
         return await MapPagedListItemsAsync(page, ct);
     }
 
-    public async Task<PagedResult<ProcurementListItem>> GetPagedByRequesterAsync(
+    public async Task<Result<PagedResult<ProcurementListItem>>> GetPagedByRequesterAsync(
         Guid requesterId, ProcurementListPageQuery query, CancellationToken ct = default)
     {
+        var userResult = await GetUserOrError(requesterId, ct);
+        if (userResult.IsFailure) return userResult.Error;
+
         var page = await procurementRepo.GetPagedByRequesterIdAsync(requesterId, query, ct);
         return await MapPagedListItemsAsync(page, ct);
     }
@@ -290,13 +317,16 @@ public sealed class ProcurementService(
     public async Task<Result<CommentResponse>> AddCommentAsync(
         Guid id, Guid userId, AddCommentRequest request, CancellationToken ct = default)
     {
+        var user = await userRepo.GetByIdAsync(userId, ct);
+        if (user is null)
+            return Error.NotFound("User", "User not found.");
+
         var procurement = await procurementRepo.GetByIdAsync(id, ct);
         if (procurement is null)
             return Error.NotFound("Procurement", $"Procurement request {id} not found.");
 
-        var user = await userRepo.GetByIdAsync(userId, ct);
-        if (user is null)
-            return Error.NotFound("User", "User not found.");
+        if (!CanView(user, procurement))
+            return Error.Unauthorized("AccessDenied", "You do not have access to this procurement request.");
 
         var comment = procurement.AddComment(userId, request.Text);
         await procurementRepo.UpdateAsync(procurement, ct);
@@ -305,8 +335,36 @@ public sealed class ProcurementService(
         return new CommentResponse(comment.Id, userId, user.Name, comment.Text, comment.CreatedAt);
     }
 
-    public async Task<DashboardMetrics> GetMetricsAsync(Guid? userId = null, CancellationToken ct = default) =>
-        await procurementRepo.GetMetricsAsync(userId, ct);
+    public async Task<Result<DashboardMetrics>> GetMetricsForUserAsync(Guid userId, CancellationToken ct = default)
+    {
+        var userResult = await GetUserOrError(userId, ct);
+        if (userResult.IsFailure) return userResult.Error;
+        var user = userResult.Value;
+
+        return await procurementRepo.GetMetricsAsync(user.Id, user.Role, ct);
+    }
+
+    private async Task<Result<User>> GetUserOrError(Guid userId, CancellationToken ct)
+    {
+        var user = await userRepo.GetByIdAsync(userId, ct);
+        return user is null
+            ? Error.NotFound("User", "User not found.")
+            : user;
+    }
+
+    private static bool CanView(User user, ProcurementRequest procurement) =>
+        user.Role switch
+        {
+            UserRole.Requester => procurement.RequesterId == user.Id,
+            UserRole.Manager => procurement.RequesterId == user.Id || procurement.Status != ProcurementStatus.Draft,
+            UserRole.Finance => procurement.RequesterId == user.Id ||
+                procurement.Status is ProcurementStatus.ManagerApproved or
+                    ProcurementStatus.FinanceApproved or
+                    ProcurementStatus.FinanceRejected or
+                    ProcurementStatus.PurchaseOrderIssued,
+            UserRole.Admin => true,
+            _ => false
+        };
 
     private async Task<Result<ProcurementRequest>> GetProcurementOrError(Guid id, CancellationToken ct)
     {

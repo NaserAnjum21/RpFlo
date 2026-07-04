@@ -73,4 +73,16 @@ export const procurementApi = {
       link.remove();
       window.URL.revokeObjectURL(url);
     }),
+
+  exportPdf: (id: string) =>
+    api.get(`/procurement/${id}/export/pdf`, { responseType: 'blob' }).then(r => {
+      const url = window.URL.createObjectURL(new Blob([r.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `purchase-order-${id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    }),
 };

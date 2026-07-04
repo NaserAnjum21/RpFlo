@@ -57,6 +57,19 @@ public class ApiIntegrationTests : IAsyncLifetime
         _client.DefaultRequestHeaders.Add("X-User-Id", userId);
     }
 
+    private async Task<Guid> GetSeededRequestIdForRequester(string requesterId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var parsedRequesterId = Guid.Parse(requesterId);
+
+        return await db.ProcurementRequests
+            .Where(p => p.RequesterId == parsedRequesterId)
+            .OrderByDescending(p => p.CreatedAt)
+            .Select(p => p.Id)
+            .FirstAsync();
+    }
+
     [Fact]
     public async Task GetUsers_ShouldReturnSeededUsers()
     {
@@ -68,33 +81,48 @@ public class ApiIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetMetrics_ShouldReturnMetrics()
+    public async Task GetMetrics_Requester_ShouldReturnOwnScopedMetrics()
     {
+        SetUser(RequesterId);
+
         var response = await _client.GetAsync("/api/procurement/metrics");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var metrics = await response.Content.ReadFromJsonAsync<DashboardMetrics>();
         metrics.Should().NotBeNull();
-        metrics!.TotalRequests.Should().BeGreaterThan(0);
+        metrics!.TotalRequests.Should().Be(12);
+        metrics.StatusBreakdown.Sum(item => item.Count).Should().Be(12);
+        metrics.DepartmentBreakdown.Sum(item => item.Count).Should().Be(12);
+        metrics.RoleMetrics.Should().NotBeNull();
+        metrics.RoleMetrics!.PendingMyReview.Should().Be(0);
+        metrics.RoleMetrics.ReadyForPo.Should().Be(0);
+        metrics.RoleMetrics.TotalValuePending.Should().Be(0);
+        metrics.RoleMetrics.MonthlySpendApproved.Should().Be(0);
     }
 
     [Fact]
-    public async Task GetAllProcurements_ShouldReturnSeededData()
+    public async Task GetAllProcurements_Requester_ShouldOnlyReturnOwnSeededData()
     {
+        SetUser(RequesterId);
+
         var response = await _client.GetAsync("/api/procurement");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var page = await response.Content.ReadFromJsonAsync<PagedResult<ProcurementListItem>>();
         page.Should().NotBeNull();
-        page!.Items.Should().NotBeEmpty();
+        page!.Items.Should().HaveCount(10);
+        page.Items.Should().OnlyContain(item => item.RequesterName == "Alice Johnson");
         page.Page.Should().Be(1);
         page.PageSize.Should().Be(10);
-        page.TotalItems.Should().BeGreaterThan(0);
+        page.TotalItems.Should().Be(12);
+        page.TotalPages.Should().Be(2);
     }
 
     [Fact]
-    public async Task GetPagedProcurements_ShouldReturnFilteredPageMetadata()
+    public async Task GetPagedProcurements_Manager_ShouldReturnFilteredPageMetadata()
     {
+        SetUser(ManagerId);
+
         var response = await _client.GetAsync("/api/procurement?page=2&pageSize=5&filter=pending");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -106,6 +134,45 @@ public class ApiIntegrationTests : IAsyncLifetime
         page.TotalPages.Should().Be(2);
         page.Items.Should().HaveCount(1);
         page.Items.Should().OnlyContain(item => item.Status == "Submitted" || item.Status == "ManagerApproved");
+    }
+
+    [Fact]
+    public async Task GetProcurementById_RequesterAccessingAnotherRequesterRequest_ShouldReturn403()
+    {
+        var bobRequestId = await GetSeededRequestIdForRequester(RequesterId2);
+        SetUser(RequesterId);
+
+        var response = await _client.GetAsync($"/api/procurement/{bobRequestId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        json.RootElement.GetProperty("code").GetString().Should().Be("Unauthorized.AccessDenied");
+    }
+
+    [Fact]
+    public async Task GetProcurementById_RequesterAccessingOwnRequest_ShouldReturnRequest()
+    {
+        var aliceRequestId = await GetSeededRequestIdForRequester(RequesterId);
+        SetUser(RequesterId);
+
+        var response = await _client.GetAsync($"/api/procurement/{aliceRequestId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var request = await response.Content.ReadFromJsonAsync<ProcurementResponse>();
+        request.Should().NotBeNull();
+        request!.Requester.Id.Should().Be(Guid.Parse(RequesterId));
+    }
+
+    [Fact]
+    public async Task GetProcurement_MissingUserHeader_ShouldReturn401()
+    {
+        _client.DefaultRequestHeaders.Remove("X-User-Id");
+
+        var response = await _client.GetAsync("/api/procurement");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        json.RootElement.GetProperty("code").GetString().Should().Be("Unauthorized.MissingUserId");
     }
 
     [Fact]
@@ -273,6 +340,21 @@ public class ApiIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AddComment_RequesterAccessingAnotherRequesterRequest_ShouldReturn403()
+    {
+        var bobRequestId = await GetSeededRequestIdForRequester(RequesterId2);
+        SetUser(RequesterId);
+
+        var response = await _client.PostAsJsonAsync(
+            $"/api/procurement/{bobRequestId}/comments",
+            new AddCommentRequest("This should not be accepted"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        json.RootElement.GetProperty("code").GetString().Should().Be("Unauthorized.AccessDenied");
+    }
+
+    [Fact]
     public async Task AddLineItems_InvalidData_ShouldReturn400()
     {
         SetUser(RequesterId);
@@ -326,12 +408,16 @@ public class ApiIntegrationTests : IAsyncLifetime
     [Fact]
     public async Task ExportCsv_ShouldReturnFile()
     {
+        SetUser(RequesterId);
+
         var response = await _client.GetAsync("/api/export/csv");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Content.Headers.ContentType!.MediaType.Should().Be("text/csv");
 
         var csv = await response.Content.ReadAsStringAsync();
         csv.Should().StartWith("Id,Title,Department,Urgency,Status,TotalAmount,Currency,Requester,CreatedAt,UpdatedAt");
+        csv.Should().Contain("Alice Johnson");
+        csv.Should().NotContain("Bob Smith");
     }
 
     [Fact]

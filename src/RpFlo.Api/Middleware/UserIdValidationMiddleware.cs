@@ -2,12 +2,9 @@ namespace RpFlo.Api.Middleware;
 
 public sealed class UserIdValidationMiddleware(RequestDelegate next)
 {
-    private static readonly HashSet<string> SafeMethods = ["GET", "HEAD", "OPTIONS"];
-
     public async Task InvokeAsync(HttpContext context)
     {
-        if (!SafeMethods.Contains(context.Request.Method)
-            && context.Request.Path.StartsWithSegments("/api"))
+        if (RequiresUserId(context.Request))
         {
             var header = context.Request.Headers["X-User-Id"].FirstOrDefault();
             if (string.IsNullOrWhiteSpace(header) || !Guid.TryParse(header, out var userId) || userId == Guid.Empty)
@@ -22,4 +19,8 @@ public sealed class UserIdValidationMiddleware(RequestDelegate next)
 
         await next(context);
     }
+
+    private static bool RequiresUserId(HttpRequest request) =>
+        request.Path.StartsWithSegments("/api") &&
+        !request.Path.StartsWithSegments("/api/users");
 }

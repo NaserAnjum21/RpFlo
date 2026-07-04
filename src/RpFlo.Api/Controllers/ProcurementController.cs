@@ -20,20 +20,24 @@ public sealed class ProcurementController(
 {
     [HttpGet]
     public async Task<ActionResult<PagedResult<ProcurementListItem>>> GetAll(
+        [FromHeader(Name = "X-User-Id")] Guid userId,
         [FromQuery] ProcurementListPageQuery query,
         CancellationToken ct) =>
-        Ok(await service.GetPagedAsync(query, ct));
+        ToActionResult(await service.GetPagedVisibleForUserAsync(userId, query, ct));
 
     [HttpGet("{id:guid}")]
-    public async Task<ActionResult<ProcurementResponse>> GetById(Guid id, CancellationToken ct) =>
-        ToActionResult(await service.GetByIdAsync(id, ct));
+    public async Task<ActionResult<ProcurementResponse>> GetById(
+        Guid id,
+        [FromHeader(Name = "X-User-Id")] Guid userId,
+        CancellationToken ct) =>
+        ToActionResult(await service.GetByIdForUserAsync(id, userId, ct));
 
     [HttpGet("my")]
     public async Task<ActionResult<PagedResult<ProcurementListItem>>> GetMy(
         [FromHeader(Name = "X-User-Id")] Guid userId,
         [FromQuery] ProcurementListPageQuery query,
         CancellationToken ct) =>
-        Ok(await service.GetPagedByRequesterAsync(userId, query, ct));
+        ToActionResult(await service.GetPagedByRequesterAsync(userId, query, ct));
 
     [HttpGet("pending")]
     public async Task<ActionResult<PagedResult<ProcurementListItem>>> GetPending(
@@ -153,14 +157,17 @@ public sealed class ProcurementController(
 
     [HttpGet("metrics")]
     public async Task<ActionResult<DashboardMetrics>> GetMetrics(
-        [FromHeader(Name = "X-User-Id")] Guid? userId,
+        [FromHeader(Name = "X-User-Id")] Guid userId,
         CancellationToken ct) =>
-        Ok(await service.GetMetricsAsync(userId, ct));
+        ToActionResult(await service.GetMetricsForUserAsync(userId, ct));
 
     [HttpGet("{id:guid}/export/pdf")]
-    public async Task<IActionResult> ExportPdf(Guid id, CancellationToken ct)
+    public async Task<IActionResult> ExportPdf(
+        Guid id,
+        [FromHeader(Name = "X-User-Id")] Guid userId,
+        CancellationToken ct)
     {
-        var result = await service.GetByIdAsync(id, ct);
+        var result = await service.GetByIdForUserAsync(id, userId, ct);
         return result.Match<IActionResult>(
             procurement =>
             {
@@ -171,7 +178,12 @@ public sealed class ProcurementController(
                 var pdf = document.GeneratePdf();
                 return File(pdf, "application/pdf");
             },
-            error => error.Code.StartsWith("NotFound") ? NotFound(new { error.Code, error.Message }) : BadRequest(new { error.Code, error.Message }));
+            error => error.Code switch
+            {
+                var c when c.StartsWith("NotFound") => NotFound(new { error.Code, error.Message }),
+                var c when c.StartsWith("Unauthorized") => StatusCode(403, new { error.Code, error.Message }),
+                _ => BadRequest(new { error.Code, error.Message })
+            });
     }
 
     private ActionResult<T> ToActionResult<T>(Result<T> result, int successCode = StatusCodes.Status200OK) =>
