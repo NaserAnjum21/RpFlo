@@ -98,6 +98,7 @@ export function RequestDetail() {
   const [editUrgency, setEditUrgency] = useState('');
   const [editLineItems, setEditLineItems] = useState<EditLineItem[]>([]);
   const [actionError, setActionError] = useState('');
+  const [needsReviseToDraft, setNeedsReviseToDraft] = useState(false);
 
   const { data: request, isLoading } = useQuery({
     queryKey: ['procurement', id],
@@ -174,17 +175,8 @@ export function RequestDetail() {
   const isRejected = request.status === 'ManagerRejected' || request.status === 'FinanceRejected';
   const canEdit = (isDraft || isRejected) && isOwner;
 
-  const startEditing = async () => {
-    if (isRejected) {
-      try {
-        await procurementApi.reviseToDraft(id!);
-        setActionError('');
-        invalidate();
-      } catch (error) {
-        handleMutationError(error);
-        return;
-      }
-    }
+  const startEditing = () => {
+    setNeedsReviseToDraft(isRejected);
     setEditTitle(request.title);
     setEditDescription(request.description);
     setEditDepartment(request.department);
@@ -196,6 +188,7 @@ export function RequestDetail() {
   const cancelEditing = () => {
     setIsEditing(false);
     setIsSaving(false);
+    setNeedsReviseToDraft(false);
   };
 
   const saveEdits = async () => {
@@ -214,6 +207,11 @@ export function RequestDetail() {
 
     setIsSaving(true);
     try {
+      if (needsReviseToDraft) {
+        await procurementApi.reviseToDraft(id!);
+        setNeedsReviseToDraft(false);
+      }
+
       await procurementApi.update(id!, {
         title: editTitle.trim(),
         description: editDescription.trim(),
@@ -487,7 +485,7 @@ export function RequestDetail() {
                     <p className="text-muted-foreground text-sm text-center py-4">No audit entries yet</p>
                   ) : (
                     <div className="space-y-4">
-                      {request.auditTrail.map(entry => (
+                      {[...request.auditTrail].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map(entry => (
                         <div key={entry.id} className="flex gap-3">
                           <div className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />
                           <div>
