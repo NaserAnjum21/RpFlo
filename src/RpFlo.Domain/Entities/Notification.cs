@@ -12,7 +12,11 @@ public sealed class Notification : AuditableEntity
 
     private Notification() { }
 
-    public static Notification Create(Guid userId, string title, string message, Guid? referenceId = null) =>
+    public static Notification Create(
+        Guid userId,
+        string title,
+        string message,
+        Guid? referenceId = null) =>
         new()
         {
             UserId = userId,

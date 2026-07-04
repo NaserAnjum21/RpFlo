@@ -21,15 +21,18 @@ public static class SeedData
 
         await db.Database.MigrateAsync();
 
-        if (await db.Users.AnyAsync()) return;
+        if (await db.Users.AnyAsync())
+        {
+            return;
+        }
 
         var users = new[]
         {
-            CreateUser(RequesterId1, "Alice Johnson", "alice@company.com", UserRole.Requester, Department.Engineering),
-            CreateUser(RequesterId2, "Bob Smith", "bob@company.com", UserRole.Requester, Department.Marketing),
-            CreateUser(ManagerId, "Carol Williams", "carol@company.com", UserRole.Manager, Department.Operations),
-            CreateUser(FinanceId, "Dave Brown", "dave@company.com", UserRole.Finance, Department.Finance),
-            CreateUser(AdminId, "Eve Davis", "eve@company.com", UserRole.Admin, Department.Operations),
+            CreateUser(RequesterId1, name: "Alice Johnson", email: "alice@company.com", UserRole.Requester, Department.Engineering),
+            CreateUser(RequesterId2, name: "Bob Smith", email: "bob@company.com", UserRole.Requester, Department.Marketing),
+            CreateUser(ManagerId, name: "Carol Williams", email: "carol@company.com", UserRole.Manager, Department.Operations),
+            CreateUser(FinanceId, name: "Dave Brown", email: "dave@company.com", UserRole.Finance, Department.Finance),
+            CreateUser(AdminId, name: "Eve Davis", email: "eve@company.com", UserRole.Admin, Department.Operations),
         };
 
         await db.Users.AddRangeAsync(users);
@@ -39,200 +42,274 @@ public static class SeedData
 
         // --- PO Issued (4) - oldest, fully processed ---
 
-        var pr1 = CreateRequest("Office Supplies Restock", "Monthly restocking of office supplies for all departments",
+        var pr1 = CreateRequest(
+            title: "Office Supplies Restock",
+            description: "Monthly restocking of office supplies for all departments",
             Department.Operations, Urgency.Low, RequesterId1, now.AddDays(-55));
-        pr1.AddLineItem("Copy Paper (Case)", 20, 45.00m);
-        pr1.AddLineItem("Ink Cartridges", 10, 32.99m);
-        pr1.AddLineItem("Sticky Notes", 50, 3.99m);
+
+        pr1.AddLineItem(name: "Copy Paper (Case)", quantity: 20, unitPrice: 45.00m);
+        pr1.AddLineItem(name: "Ink Cartridges", quantity: 10, unitPrice: 32.99m);
+        pr1.AddLineItem(name: "Sticky Notes", quantity: 50, unitPrice: 3.99m);
         Submit(pr1, RequesterId1, now.AddDays(-54));
-        ApproveManager(pr1, ManagerId, now.AddDays(-53), "Standard monthly order");
-        ApproveFinance(pr1, FinanceId, now.AddDays(-52), "Within monthly office budget");
+        ApproveManager(pr1, ManagerId, now.AddDays(-53), comment: "Standard monthly order");
+        ApproveFinance(pr1, FinanceId, now.AddDays(-52), comment: "Within monthly office budget");
         IssuePo(pr1, FinanceId, now.AddDays(-51));
         requests.Add(pr1);
 
-        var pr2 = CreateRequest("Ergonomic Keyboards", "Mechanical keyboards for developer team to reduce RSI risk",
+        var pr2 = CreateRequest(
+            title: "Ergonomic Keyboards",
+            description: "Mechanical keyboards for developer team to reduce RSI risk",
             Department.Engineering, Urgency.Medium, RequesterId1, now.AddDays(-48));
-        pr2.AddLineItem("Kinesis Advantage360", 8, 449.00m);
-        pr2.AddLineItem("Keyboard Wrist Rest", 8, 24.99m);
+
+        pr2.AddLineItem(name: "Kinesis Advantage360", quantity: 8, unitPrice: 449.00m);
+        pr2.AddLineItem(name: "Keyboard Wrist Rest", quantity: 8, unitPrice: 24.99m);
         Submit(pr2, RequesterId1, now.AddDays(-47));
-        ApproveManager(pr2, ManagerId, now.AddDays(-45), "Health & safety priority");
+        ApproveManager(pr2, ManagerId, now.AddDays(-45), comment: "Health & safety priority");
         ApproveFinance(pr2, FinanceId, now.AddDays(-43));
         IssuePo(pr2, FinanceId, now.AddDays(-42));
         requests.Add(pr2);
 
-        var pr3 = CreateRequest("Conference Room AV Upgrade", "Replace aging projectors with modern displays and webcams",
+        var pr3 = CreateRequest(
+            title: "Conference Room AV Upgrade",
+            description: "Replace aging projectors with modern displays and webcams",
             Department.Operations, Urgency.High, RequesterId1, now.AddDays(-40));
-        pr3.AddLineItem("75\" 4K Display", 3, 1899.00m);
-        pr3.AddLineItem("Conference Webcam", 3, 299.99m);
-        pr3.AddLineItem("Wireless Presenter", 3, 79.99m);
-        pr3.AddLineItem("HDMI Cables (10ft)", 6, 12.99m);
+
+        pr3.AddLineItem(name: "75\" 4K Display", quantity: 3, unitPrice: 1899.00m);
+        pr3.AddLineItem(name: "Conference Webcam", quantity: 3, unitPrice: 299.99m);
+        pr3.AddLineItem(name: "Wireless Presenter", quantity: 3, unitPrice: 79.99m);
+        pr3.AddLineItem(name: "HDMI Cables (10ft)", quantity: 6, unitPrice: 12.99m);
         Submit(pr3, RequesterId1, now.AddDays(-39));
         ApproveManager(pr3, ManagerId, now.AddDays(-37));
-        ApproveFinance(pr3, FinanceId, now.AddDays(-34), "Capital expenditure approved for Q2");
+        ApproveFinance(pr3, FinanceId, now.AddDays(-34), comment: "Capital expenditure approved for Q2");
         IssuePo(pr3, FinanceId, now.AddDays(-33));
         requests.Add(pr3);
 
-        var pr4 = CreateRequest("Marketing Print Materials", "Brochures and business cards for trade show next month",
+        var pr4 = CreateRequest(
+            title: "Marketing Print Materials",
+            description: "Brochures and business cards for trade show next month",
             Department.Marketing, Urgency.High, RequesterId2, now.AddDays(-35));
-        pr4.AddLineItem("Brochures (1000 pack)", 5, 350.00m);
-        pr4.AddLineItem("Business Cards (500)", 10, 45.00m);
-        pr4.AddLineItem("Banner Stands", 3, 275.00m);
+
+        pr4.AddLineItem(name: "Brochures (1000 pack)", quantity: 5, unitPrice: 350.00m);
+        pr4.AddLineItem(name: "Business Cards (500)", quantity: 10, unitPrice: 45.00m);
+        pr4.AddLineItem(name: "Banner Stands", quantity: 3, unitPrice: 275.00m);
         Submit(pr4, RequesterId2, now.AddDays(-34));
-        ApproveManager(pr4, ManagerId, now.AddDays(-33), "Trade show budget approved");
+        ApproveManager(pr4, ManagerId, now.AddDays(-33), comment: "Trade show budget approved");
         ApproveFinance(pr4, FinanceId, now.AddDays(-31));
         IssuePo(pr4, FinanceId, now.AddDays(-30));
         requests.Add(pr4);
 
         // --- Finance Approved (2) - awaiting PO issuance ---
 
-        var pr5 = CreateRequest("Development Laptops", "New MacBook Pro laptops for engineering team expansion",
+        var pr5 = CreateRequest(
+            title: "Development Laptops",
+            description: "New MacBook Pro laptops for engineering team expansion",
             Department.Engineering, Urgency.High, RequesterId1, now.AddDays(-20));
-        pr5.AddLineItem("MacBook Pro 16\" M4", 5, 2499.00m);
-        pr5.AddLineItem("USB-C Dock", 5, 189.99m);
-        pr5.AddLineItem("Monitor Stand", 5, 49.99m);
+
+        pr5.AddLineItem(name: "MacBook Pro 16\" M4", quantity: 5, unitPrice: 2499.00m);
+        pr5.AddLineItem(name: "USB-C Dock", quantity: 5, unitPrice: 189.99m);
+        pr5.AddLineItem(name: "Monitor Stand", quantity: 5, unitPrice: 49.99m);
         Submit(pr5, RequesterId1, now.AddDays(-19));
-        ApproveManager(pr5, ManagerId, now.AddDays(-17), "Team expansion confirmed by CTO");
-        ApproveFinance(pr5, FinanceId, now.AddDays(-14), "CapEx budget available");
+        ApproveManager(pr5, ManagerId, now.AddDays(-17), comment: "Team expansion confirmed by CTO");
+        ApproveFinance(pr5, FinanceId, now.AddDays(-14), comment: "CapEx budget available");
         requests.Add(pr5);
 
-        var pr6 = CreateRequest("Safety Equipment Renewal", "Annual safety equipment replacement for warehouse staff",
+        var pr6 = CreateRequest(
+            title: "Safety Equipment Renewal",
+            description: "Annual safety equipment replacement for warehouse staff",
             Department.Operations, Urgency.Critical, RequesterId1, now.AddDays(-18));
-        pr6.AddLineItem("Hard Hats", 25, 32.00m);
-        pr6.AddLineItem("Safety Goggles", 25, 18.50m);
-        pr6.AddLineItem("Hi-Vis Vests", 25, 14.99m);
-        pr6.AddLineItem("Steel-Toe Boots", 25, 89.99m);
+
+        pr6.AddLineItem(name: "Hard Hats", quantity: 25, unitPrice: 32.00m);
+        pr6.AddLineItem(name: "Safety Goggles", quantity: 25, unitPrice: 18.50m);
+        pr6.AddLineItem(name: "Hi-Vis Vests", quantity: 25, unitPrice: 14.99m);
+        pr6.AddLineItem(name: "Steel-Toe Boots", quantity: 25, unitPrice: 89.99m);
         Submit(pr6, RequesterId1, now.AddDays(-17));
-        ApproveManager(pr6, ManagerId, now.AddDays(-16), "Compliance requirement");
+        ApproveManager(pr6, ManagerId, now.AddDays(-16), comment: "Compliance requirement");
         ApproveFinance(pr6, FinanceId, now.AddDays(-14));
         requests.Add(pr6);
 
         // --- Manager Approved (3) - awaiting finance review ---
 
-        var pr7 = CreateRequest("Marketing Campaign Materials", "Branded merchandise for Q3 campaign launch",
+        var pr7 = CreateRequest(
+            title: "Marketing Campaign Materials",
+            description: "Branded merchandise for Q3 campaign launch",
             Department.Marketing, Urgency.Medium, RequesterId2, now.AddDays(-12));
-        pr7.AddLineItem("Branded T-Shirts", 200, 12.50m);
-        pr7.AddLineItem("Tote Bags", 150, 8.75m);
-        pr7.AddLineItem("Stickers (Sheet of 50)", 100, 3.25m);
+
+        pr7.AddLineItem(name: "Branded T-Shirts", quantity: 200, unitPrice: 12.50m);
+        pr7.AddLineItem(name: "Tote Bags", quantity: 150, unitPrice: 8.75m);
+        pr7.AddLineItem(name: "Stickers (Sheet of 50)", quantity: 100, unitPrice: 3.25m);
         Submit(pr7, RequesterId2, now.AddDays(-11));
-        ApproveManager(pr7, ManagerId, now.AddDays(-9), "Approved for Q3 campaign budget");
+        ApproveManager(pr7, ManagerId, now.AddDays(-9), comment: "Approved for Q3 campaign budget");
         requests.Add(pr7);
 
-        var pr8 = CreateRequest("Cloud Infrastructure Expansion", "Additional AWS capacity for new microservices",
+        var pr8 = CreateRequest(
+            title: "Cloud Infrastructure Expansion",
+            description: "Additional AWS capacity for new microservices",
             Department.Engineering, Urgency.High, RequesterId1, now.AddDays(-10));
-        pr8.AddLineItem("Reserved EC2 Instances (1yr)", 4, 3200.00m);
-        pr8.AddLineItem("RDS Instance Upgrade", 2, 1800.00m);
-        pr8.AddLineItem("CloudWatch Advanced Monitoring", 1, 450.00m);
+
+        pr8.AddLineItem(name: "Reserved EC2 Instances (1yr)", quantity: 4, unitPrice: 3200.00m);
+        pr8.AddLineItem(name: "RDS Instance Upgrade", quantity: 2, unitPrice: 1800.00m);
+        pr8.AddLineItem(name: "CloudWatch Advanced Monitoring", quantity: 1, unitPrice: 450.00m);
         Submit(pr8, RequesterId1, now.AddDays(-9));
         ApproveManager(pr8, ManagerId, now.AddDays(-7));
         requests.Add(pr8);
 
-        var pr9 = CreateRequest("HR Onboarding Kits", "Welcome kits for 15 new hires starting next month",
+        var pr9 = CreateRequest(
+            title: "HR Onboarding Kits",
+            description: "Welcome kits for 15 new hires starting next month",
             Department.HumanResources, Urgency.Medium, RequesterId2, now.AddDays(-8));
-        pr9.AddLineItem("Welcome Package Box", 15, 35.00m);
-        pr9.AddLineItem("Company Notebook", 15, 12.00m);
-        pr9.AddLineItem("Branded Water Bottle", 15, 18.00m);
-        pr9.AddLineItem("Lanyard + Badge Holder", 15, 5.50m);
+
+        pr9.AddLineItem(name: "Welcome Package Box", quantity: 15, unitPrice: 35.00m);
+        pr9.AddLineItem(name: "Company Notebook", quantity: 15, unitPrice: 12.00m);
+        pr9.AddLineItem(name: "Branded Water Bottle", quantity: 15, unitPrice: 18.00m);
+        pr9.AddLineItem(name: "Lanyard + Badge Holder", quantity: 15, unitPrice: 5.50m);
         Submit(pr9, RequesterId2, now.AddDays(-7));
-        ApproveManager(pr9, ManagerId, now.AddDays(-5), "New hire batch confirmed");
+        ApproveManager(pr9, ManagerId, now.AddDays(-5), comment: "New hire batch confirmed");
         requests.Add(pr9);
 
         // --- Submitted (3) - awaiting manager approval ---
 
-        var pr10 = CreateRequest("Sales Team Tablets", "iPads for field sales team demos and order entry",
+        var pr10 = CreateRequest(
+            title: "Sales Team Tablets",
+            description: "iPads for field sales team demos and order entry",
             Department.Sales, Urgency.Medium, RequesterId2, now.AddDays(-6));
-        pr10.AddLineItem("iPad Pro 11\"", 8, 1099.00m);
-        pr10.AddLineItem("Apple Pencil", 8, 129.00m);
-        pr10.AddLineItem("Protective Case", 8, 49.99m);
+
+        pr10.AddLineItem(name: "iPad Pro 11\"", quantity: 8, unitPrice: 1099.00m);
+        pr10.AddLineItem(name: "Apple Pencil", quantity: 8, unitPrice: 129.00m);
+        pr10.AddLineItem(name: "Protective Case", quantity: 8, unitPrice: 49.99m);
         Submit(pr10, RequesterId2, now.AddDays(-5));
         requests.Add(pr10);
 
-        var pr11 = CreateRequest("Server Upgrade", "Upgrade production database server hardware",
+        var pr11 = CreateRequest(
+            title: "Server Upgrade",
+            description: "Upgrade production database server hardware",
             Department.Engineering, Urgency.Critical, RequesterId1, now.AddDays(-4));
-        pr11.AddLineItem("Dell PowerEdge R760", 1, 12500.00m);
-        pr11.AddLineItem("128GB DDR5 ECC RAM", 4, 899.00m);
-        pr11.AddLineItem("NVMe SSD 4TB", 4, 649.00m);
+
+        pr11.AddLineItem(name: "Dell PowerEdge R760", quantity: 1, unitPrice: 12500.00m);
+        pr11.AddLineItem(name: "128GB DDR5 ECC RAM", quantity: 4, unitPrice: 899.00m);
+        pr11.AddLineItem(name: "NVMe SSD 4TB", quantity: 4, unitPrice: 649.00m);
         Submit(pr11, RequesterId1, now.AddDays(-3));
         requests.Add(pr11);
 
-        var pr12 = CreateRequest("Office Coffee Service", "Premium coffee service subscription for break rooms",
+        var pr12 = CreateRequest(
+            title: "Office Coffee Service",
+            description: "Premium coffee service subscription for break rooms",
             Department.Operations, Urgency.Low, RequesterId2, now.AddDays(-2));
-        pr12.AddLineItem("Coffee Machine Lease (Monthly)", 3, 150.00m);
-        pr12.AddLineItem("Premium Coffee Beans (Monthly)", 3, 85.00m);
-        pr12.AddLineItem("Supplies Kit", 3, 45.00m);
+
+        pr12.AddLineItem(name: "Coffee Machine Lease (Monthly)", quantity: 3, unitPrice: 150.00m);
+        pr12.AddLineItem(name: "Premium Coffee Beans (Monthly)", quantity: 3, unitPrice: 85.00m);
+        pr12.AddLineItem(name: "Supplies Kit", quantity: 3, unitPrice: 45.00m);
         Submit(pr12, RequesterId2, now.AddDays(-1));
         requests.Add(pr12);
 
         // --- Manager Rejected (2) ---
 
-        var pr13 = CreateRequest("Standing Desk Converters", "Desktop standing desk risers for interested team members",
+        var pr13 = CreateRequest(
+            title: "Standing Desk Converters",
+            description: "Desktop standing desk risers for interested team members",
             Department.Engineering, Urgency.Low, RequesterId1, now.AddDays(-30));
-        pr13.AddLineItem("VariDesk Pro Plus 36", 12, 395.00m);
-        pr13.AddLineItem("Anti-Fatigue Mat", 12, 49.99m);
+
+        pr13.AddLineItem(name: "VariDesk Pro Plus 36", quantity: 12, unitPrice: 395.00m);
+        pr13.AddLineItem(name: "Anti-Fatigue Mat", quantity: 12, unitPrice: 49.99m);
         Submit(pr13, RequesterId1, now.AddDays(-29));
-        RejectManager(pr13, ManagerId, now.AddDays(-27), "Need updated vendor quotes before approval. Current pricing seems high compared to recent catalog.");
+
+        RejectManager(pr13, ManagerId, now.AddDays(-27),
+            reason: "Need updated vendor quotes before approval. Current pricing seems high compared to recent catalog.");
+
         requests.Add(pr13);
 
-        var pr14 = CreateRequest("Team Retreat Venue", "Booking for annual engineering team retreat",
+        var pr14 = CreateRequest(
+            title: "Team Retreat Venue",
+            description: "Booking for annual engineering team retreat",
             Department.Engineering, Urgency.Medium, RequesterId1, now.AddDays(-22));
-        pr14.AddLineItem("Venue Rental (3 days)", 1, 4500.00m);
-        pr14.AddLineItem("Catering Package", 30, 85.00m);
-        pr14.AddLineItem("AV Equipment Rental", 1, 750.00m);
+
+        pr14.AddLineItem(name: "Venue Rental (3 days)", quantity: 1, unitPrice: 4500.00m);
+        pr14.AddLineItem(name: "Catering Package", quantity: 30, unitPrice: 85.00m);
+        pr14.AddLineItem(name: "AV Equipment Rental", quantity: 1, unitPrice: 750.00m);
         Submit(pr14, RequesterId1, now.AddDays(-21));
-        RejectManager(pr14, ManagerId, now.AddDays(-19), "Budget freeze on discretionary spending until Q3 review completes. Resubmit after July 15th.");
+
+        RejectManager(pr14, ManagerId, now.AddDays(-19),
+            reason: "Budget freeze on discretionary spending until Q3 review completes. Resubmit after July 15th.");
+
         requests.Add(pr14);
 
         // --- Finance Rejected (2) ---
 
-        var pr15 = CreateRequest("Premium Design Software Licenses", "Adobe Creative Cloud and Figma enterprise licenses",
+        var pr15 = CreateRequest(
+            title: "Premium Design Software Licenses",
+            description: "Adobe Creative Cloud and Figma enterprise licenses",
             Department.Marketing, Urgency.High, RequesterId2, now.AddDays(-25));
-        pr15.AddLineItem("Adobe Creative Cloud (Annual)", 10, 659.88m);
-        pr15.AddLineItem("Figma Enterprise (Annual)", 10, 540.00m);
+
+        pr15.AddLineItem(name: "Adobe Creative Cloud (Annual)", quantity: 10, unitPrice: 659.88m);
+        pr15.AddLineItem(name: "Figma Enterprise (Annual)", quantity: 10, unitPrice: 540.00m);
         Submit(pr15, RequesterId2, now.AddDays(-24));
-        ApproveManager(pr15, ManagerId, now.AddDays(-22), "Essential tooling for design team");
-        RejectFinance(pr15, FinanceId, now.AddDays(-19), "Annual license costs exceed department budget. Please explore volume discount options and resubmit with revised pricing.");
+        ApproveManager(pr15, ManagerId, now.AddDays(-22), comment: "Essential tooling for design team");
+
+        RejectFinance(pr15, FinanceId, now.AddDays(-19),
+            reason: "Annual license costs exceed department budget. Please explore volume discount options and resubmit with revised pricing.");
+
         requests.Add(pr15);
 
-        var pr16 = CreateRequest("Office Furniture Refresh", "Replace worn conference room furniture",
+        var pr16 = CreateRequest(
+            title: "Office Furniture Refresh",
+            description: "Replace worn conference room furniture",
             Department.Operations, Urgency.Low, RequesterId1, now.AddDays(-28));
-        pr16.AddLineItem("Conference Table (12-seat)", 2, 2800.00m);
-        pr16.AddLineItem("Ergonomic Chair", 24, 450.00m);
-        pr16.AddLineItem("Whiteboard (6ft)", 4, 320.00m);
+
+        pr16.AddLineItem(name: "Conference Table (12-seat)", quantity: 2, unitPrice: 2800.00m);
+        pr16.AddLineItem(name: "Ergonomic Chair", quantity: 24, unitPrice: 450.00m);
+        pr16.AddLineItem(name: "Whiteboard (6ft)", quantity: 4, unitPrice: 320.00m);
         Submit(pr16, RequesterId1, now.AddDays(-27));
         ApproveManager(pr16, ManagerId, now.AddDays(-25));
-        RejectFinance(pr16, FinanceId, now.AddDays(-22), "Total exceeds furniture capex threshold. Split into two requests — chairs this quarter, tables next quarter.");
+
+        RejectFinance(pr16, FinanceId, now.AddDays(-22),
+            reason: "Total exceeds furniture capex threshold. Split into two requests — chairs this quarter, tables next quarter.");
+
         requests.Add(pr16);
 
         // --- Drafts (4) ---
 
-        var pr17 = CreateRequest("Team Building Event", "Quarterly team outing — escape room and dinner",
+        var pr17 = CreateRequest(
+            title: "Team Building Event",
+            description: "Quarterly team outing — escape room and dinner",
             Department.HumanResources, Urgency.Low, RequesterId2, now.AddDays(-3));
-        pr17.AddLineItem("Escape Room Booking (20 ppl)", 1, 500.00m);
-        pr17.AddLineItem("Restaurant Reservation", 1, 1200.00m);
+
+        pr17.AddLineItem(name: "Escape Room Booking (20 ppl)", quantity: 1, unitPrice: 500.00m);
+        pr17.AddLineItem(name: "Restaurant Reservation", quantity: 1, unitPrice: 1200.00m);
         requests.Add(pr17);
 
-        var pr18 = CreateRequest("Developer Conference Tickets", "Tickets and travel for team to attend re:Invent",
+        var pr18 = CreateRequest(
+            title: "Developer Conference Tickets",
+            description: "Tickets and travel for team to attend re:Invent",
             Department.Engineering, Urgency.Medium, RequesterId1, now.AddDays(-2));
-        pr18.AddLineItem("Conference Pass", 4, 1799.00m);
-        pr18.AddLineItem("Flight (Round Trip)", 4, 650.00m);
-        pr18.AddLineItem("Hotel (4 nights)", 4, 280.00m);
+
+        pr18.AddLineItem(name: "Conference Pass", quantity: 4, unitPrice: 1799.00m);
+        pr18.AddLineItem(name: "Flight (Round Trip)", quantity: 4, unitPrice: 650.00m);
+        pr18.AddLineItem(name: "Hotel (4 nights)", quantity: 4, unitPrice: 280.00m);
         requests.Add(pr18);
 
-        var pr19 = CreateRequest("Warehouse Shelving Units", "Additional storage for inventory overflow",
+        var pr19 = CreateRequest(
+            title: "Warehouse Shelving Units",
+            description: "Additional storage for inventory overflow",
             Department.Operations, Urgency.High, RequesterId2, now.AddDays(-1));
-        pr19.AddLineItem("Heavy-Duty Shelving Unit", 10, 189.00m);
-        pr19.AddLineItem("Shelf Labels (100 pack)", 5, 15.99m);
+
+        pr19.AddLineItem(name: "Heavy-Duty Shelving Unit", quantity: 10, unitPrice: 189.00m);
+        pr19.AddLineItem(name: "Shelf Labels (100 pack)", quantity: 5, unitPrice: 15.99m);
         requests.Add(pr19);
 
-        var pr20 = CreateRequest("Customer Support Headsets", "Wireless headsets for support team",
+        var pr20 = CreateRequest(
+            title: "Customer Support Headsets",
+            description: "Wireless headsets for support team",
             Department.Sales, Urgency.Medium, RequesterId1, now.AddDays(-1));
-        pr20.AddLineItem("Jabra Evolve2 75", 12, 299.99m);
-        pr20.AddLineItem("Headset Stand", 12, 24.99m);
+
+        pr20.AddLineItem(name: "Jabra Evolve2 75", quantity: 12, unitPrice: 299.99m);
+        pr20.AddLineItem(name: "Headset Stand", quantity: 12, unitPrice: 24.99m);
         requests.Add(pr20);
 
         await db.ProcurementRequests.AddRangeAsync(requests);
 
         foreach (var r in requests)
+        {
             r.ClearDomainEvents();
+        }
 
         await db.SaveChangesAsync();
     }

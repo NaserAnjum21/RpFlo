@@ -15,12 +15,14 @@ public sealed class ExportController(ProcurementService service) : ControllerBas
     {
         var result = await service.GetAllVisibleForUserAsync(userId, ct);
         if (result.IsFailure)
+        {
             return result.Error.Code switch
             {
                 var c when c.StartsWith("NotFound") => NotFound(new { result.Error.Code, result.Error.Message }),
                 var c when c.StartsWith("Unauthorized") => StatusCode(403, new { result.Error.Code, result.Error.Message }),
                 _ => BadRequest(new { result.Error.Code, result.Error.Message })
             };
+        }
 
         var items = result.Value;
 

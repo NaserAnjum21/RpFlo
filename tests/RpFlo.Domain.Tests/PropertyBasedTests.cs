@@ -36,7 +36,7 @@ public class PropertyBasedTests
     public bool LineItem_TotalPrice_EqualsQuantityTimesUnitPrice(PositiveInt qty, PositiveInt price)
     {
         var unitPrice = (decimal)price.Get / 100;
-        var item = LineItem.Create("Test", qty.Get, unitPrice, Guid.NewGuid());
+        var item = LineItem.Create(name: "Test", qty.Get, unitPrice, requestId: Guid.NewGuid());
         var expected = Money.Create(unitPrice).Multiply(qty.Get).Amount;
         return item.TotalPrice.Amount == expected;
     }
@@ -45,7 +45,7 @@ public class PropertyBasedTests
     public bool ProcurementRequest_CannotIssuePO_FromDraft()
     {
         var pr = ProcurementRequest.Create("Test", "Desc", Department.Engineering, Urgency.Low, Guid.NewGuid());
-        pr.AddLineItem("Item", 1, 100m);
+        pr.AddLineItem(name: "Item", quantity: 1, unitPrice: 100m);
         return pr.IssuePurchaseOrder(Guid.NewGuid()).IsFailure;
     }
 
@@ -53,7 +53,7 @@ public class PropertyBasedTests
     public bool ProcurementRequest_CannotReject_FromDraft()
     {
         var pr = ProcurementRequest.Create("Test", "Desc", Department.Engineering, Urgency.Low, Guid.NewGuid());
-        pr.AddLineItem("Item", 1, 100m);
+        pr.AddLineItem(name: "Item", quantity: 1, unitPrice: 100m);
         return pr.RejectByManager(Guid.NewGuid(), "reason").IsFailure;
     }
 
@@ -69,7 +69,7 @@ public class PropertyBasedTests
             {
                 var qty = i + 1;
                 var price = (i + 1) * 10m;
-                pr.AddLineItem($"Item {i}", qty, price);
+                pr.AddLineItem(name: $"Item {i}", quantity: qty, unitPrice: price);
                 expectedTotal += Money.Create(price).Multiply(qty).Amount;
             }
 

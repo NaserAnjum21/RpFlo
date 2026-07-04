@@ -25,8 +25,11 @@ public sealed class NotificationRepository(AppDbContext db) : INotificationRepos
     {
         var notification = await db.Notifications
             .FirstOrDefaultAsync(n => n.Id == notificationId && n.UserId == userId, ct);
+
         if (notification is null)
+        {
             return false;
+        }
 
         notification.MarkAsRead();
         return true;

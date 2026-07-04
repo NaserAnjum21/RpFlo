@@ -39,8 +39,8 @@ public class MoneyTests
     [Fact]
     public void Add_DifferentCurrency_ShouldThrow()
     {
-        var a = Money.Create(100, "USD");
-        var b = Money.Create(50, "EUR");
+        var a = Money.Create(100, currency: "USD");
+        var b = Money.Create(50, currency: "EUR");
         var act = () => a.Add(b);
         act.Should().Throw<InvalidOperationException>();
     }

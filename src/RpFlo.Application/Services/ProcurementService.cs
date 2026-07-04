@@ -19,7 +19,9 @@ public sealed class ProcurementService(
     {
         var user = await userRepo.GetByIdAsync(requesterId, ct);
         if (user is null)
-            return Error.NotFound("User", "User not found.");
+        {
+            return Error.NotFound(code: "User", message: "User not found.");
+        }
 
         var procurement = ProcurementRequest.Create(
             request.Title,
@@ -31,7 +33,10 @@ public sealed class ProcurementService(
         foreach (var item in request.LineItems)
         {
             var result = procurement.AddLineItem(item.Name, item.Quantity, item.UnitPrice);
-            if (result.IsFailure) return result.Error;
+            if (result.IsFailure)
+            {
+                return result.Error;
+            }
         }
 
         await procurementRepo.AddAsync(procurement, ct);
@@ -46,15 +51,22 @@ public sealed class ProcurementService(
         CancellationToken ct = default)
     {
         var userResult = await GetUserOrError(userId, ct);
-        if (userResult.IsFailure) return userResult.Error;
+        if (userResult.IsFailure)
+        {
+            return userResult.Error;
+        }
         var user = userResult.Value;
 
         var procurement = await procurementRepo.GetByIdAsync(id, ct);
         if (procurement is null)
-            return Error.NotFound("Procurement", $"Procurement request {id} not found.");
+        {
+            return Error.NotFound(code: "Procurement", message: $"Procurement request {id} not found.");
+        }
 
         if (!CanView(user, procurement))
-            return Error.Unauthorized("AccessDenied", "You do not have access to this procurement request.");
+        {
+            return Error.Unauthorized(code: "AccessDenied", message: "You do not have access to this procurement request.");
+        }
 
         var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
         return await MapToResponseAsync(procurement, requester!, ct);
@@ -65,7 +77,10 @@ public sealed class ProcurementService(
         CancellationToken ct = default)
     {
         var userResult = await GetUserOrError(userId, ct);
-        if (userResult.IsFailure) return userResult.Error;
+        if (userResult.IsFailure)
+        {
+            return userResult.Error;
+        }
         var user = userResult.Value;
 
         var items = await procurementRepo.GetVisibleListItemsForUserAsync(user.Id, user.Role, ct);
@@ -77,7 +92,10 @@ public sealed class ProcurementService(
         ProcurementListPageQuery query, CancellationToken ct = default)
     {
         var userResult = await GetUserOrError(userId, ct);
-        if (userResult.IsFailure) return userResult.Error;
+        if (userResult.IsFailure)
+        {
+            return userResult.Error;
+        }
         var user = userResult.Value;
 
         return await procurementRepo.GetPagedVisibleForUserAsync(user.Id, user.Role, query, ct);
@@ -87,7 +105,10 @@ public sealed class ProcurementService(
         Guid requesterId, ProcurementListPageQuery query, CancellationToken ct = default)
     {
         var userResult = await GetUserOrError(requesterId, ct);
-        if (userResult.IsFailure) return userResult.Error;
+        if (userResult.IsFailure)
+        {
+            return userResult.Error;
+        }
 
         return await procurementRepo.GetPagedByRequesterIdAsync(requesterId, query, ct);
     }
@@ -97,7 +118,9 @@ public sealed class ProcurementService(
     {
         var user = await userRepo.GetByIdAsync(userId, ct);
         if (user is null)
-            return Error.NotFound("User", "User not found.");
+        {
+            return Error.NotFound(code: "User", message: "User not found.");
+        }
 
         return await procurementRepo.GetPagedPendingForUserAsync(userId, user.Role, query, ct);
     }
@@ -110,13 +133,20 @@ public sealed class ProcurementService(
     {
         var procurement = await procurementRepo.GetByIdAsync(id, ct);
         if (procurement is null)
-            return Error.NotFound("Procurement", $"Procurement request {id} not found.");
+        {
+            return Error.NotFound(code: "Procurement", message: $"Procurement request {id} not found.");
+        }
 
         if (procurement.RequesterId != requesterId)
-            return Error.Unauthorized("NotOwner", "Only the requester can update this request.");
+        {
+            return Error.Unauthorized(code: "NotOwner", message: "Only the requester can update this request.");
+        }
 
         var result = procurement.Update(request.Title, request.Description, request.Department, request.Urgency);
-        if (result.IsFailure) return result.Error;
+        if (result.IsFailure)
+        {
+            return result.Error;
+        }
 
         await procurementRepo.UpdateAsync(procurement, ct);
         await unitOfWork.SaveChangesAsync(ct);
@@ -133,15 +163,22 @@ public sealed class ProcurementService(
     {
         var procurement = await procurementRepo.GetByIdAsync(id, ct);
         if (procurement is null)
-            return Error.NotFound("Procurement", $"Procurement request {id} not found.");
+        {
+            return Error.NotFound(code: "Procurement", message: $"Procurement request {id} not found.");
+        }
 
         if (procurement.RequesterId != requesterId)
-            return Error.Unauthorized("NotOwner", "Only the requester can modify line items.");
+        {
+            return Error.Unauthorized(code: "NotOwner", message: "Only the requester can modify line items.");
+        }
 
         foreach (var item in request.LineItems)
         {
             var result = procurement.AddLineItem(item.Name, item.Quantity, item.UnitPrice);
-            if (result.IsFailure) return result.Error;
+            if (result.IsFailure)
+            {
+                return result.Error;
+            }
         }
 
         await procurementRepo.UpdateAsync(procurement, ct);
@@ -159,13 +196,20 @@ public sealed class ProcurementService(
     {
         var procurement = await procurementRepo.GetByIdAsync(id, ct);
         if (procurement is null)
-            return Error.NotFound("Procurement", $"Procurement request {id} not found.");
+        {
+            return Error.NotFound(code: "Procurement", message: $"Procurement request {id} not found.");
+        }
 
         if (procurement.RequesterId != requesterId)
-            return Error.Unauthorized("NotOwner", "Only the requester can modify line items.");
+        {
+            return Error.Unauthorized(code: "NotOwner", message: "Only the requester can modify line items.");
+        }
 
         var result = procurement.RemoveLineItem(lineItemId);
-        if (result.IsFailure) return result.Error;
+        if (result.IsFailure)
+        {
+            return result.Error;
+        }
 
         await procurementRepo.DeleteLineItemAsync(lineItemId, ct);
         await procurementRepo.UpdateAsync(procurement, ct);
@@ -180,14 +224,25 @@ public sealed class ProcurementService(
     {
         var procurement = await procurementRepo.GetByIdAsync(id, ct);
         if (procurement is null)
-            return Error.NotFound("Procurement", $"Procurement request {id} not found.");
+        {
+            return Error.NotFound(code: "Procurement", message: $"Procurement request {id} not found.");
+        }
 
         var result = procurement.Submit(requesterId);
-        if (result.IsFailure) return result.Error;
+        if (result.IsFailure)
+        {
+            return result.Error;
+        }
 
         await procurementRepo.UpdateAsync(procurement, ct);
-        await NotifyUsersWithRole(UserRole.Manager, "New Procurement Request",
-            $"'{procurement.Title}' submitted for review.", procurement.Id, ct);
+
+        await NotifyUsersWithRole(
+            UserRole.Manager,
+            title: "New Procurement Request",
+            message: $"'{procurement.Title}' submitted for review.",
+            referenceId: procurement.Id,
+            ct);
+
         await unitOfWork.SaveChangesAsync(ct);
 
         var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
@@ -198,19 +253,44 @@ public sealed class ProcurementService(
         Guid id, Guid approverId, ApprovalRequest request, CancellationToken ct = default)
     {
         var procResult = await GetProcurementOrError(id, ct);
-        if (procResult.IsFailure) return procResult.Error;
+        if (procResult.IsFailure)
+        {
+            return procResult.Error;
+        }
         var procurement = procResult.Value;
 
-        var roleResult = await RequireRole(approverId, UserRole.Manager, "NotManager", "Only managers can approve at this stage.", ct);
-        if (roleResult.IsFailure) return roleResult.Error;
+        var roleResult = await RequireRole(
+            approverId,
+            UserRole.Manager,
+            errorCode: "NotManager",
+            errorMessage: "Only managers can approve at this stage.",
+            ct);
+
+        if (roleResult.IsFailure)
+        {
+            return roleResult.Error;
+        }
 
         var result = procurement.ApproveByManager(approverId, request.Comment);
-        if (result.IsFailure) return result.Error;
+        if (result.IsFailure)
+        {
+            return result.Error;
+        }
 
-        await NotifyUser(procurement.RequesterId, "Request Approved by Manager",
-            $"'{procurement.Title}' approved by manager. Pending finance review.", procurement.Id, ct);
-        await NotifyUsersWithRole(UserRole.Finance, "Procurement Pending Finance Review",
-            $"'{procurement.Title}' awaiting finance approval.", procurement.Id, ct);
+        await NotifyUser(
+            procurement.RequesterId,
+            title: "Request Approved by Manager",
+            message: $"'{procurement.Title}' approved by manager. Pending finance review.",
+            referenceId: procurement.Id,
+            ct);
+
+        await NotifyUsersWithRole(
+            UserRole.Finance,
+            title: "Procurement Pending Finance Review",
+            message: $"'{procurement.Title}' awaiting finance approval.",
+            referenceId: procurement.Id,
+            ct);
+
         return await SaveAndRespond(procurement, ct);
     }
 
@@ -218,17 +298,37 @@ public sealed class ProcurementService(
         Guid id, Guid reviewerId, RejectionRequest request, CancellationToken ct = default)
     {
         var procResult = await GetProcurementOrError(id, ct);
-        if (procResult.IsFailure) return procResult.Error;
+        if (procResult.IsFailure)
+        {
+            return procResult.Error;
+        }
         var procurement = procResult.Value;
 
-        var roleResult = await RequireRole(reviewerId, UserRole.Manager, "NotManager", "Only managers can reject at this stage.", ct);
-        if (roleResult.IsFailure) return roleResult.Error;
+        var roleResult = await RequireRole(
+            reviewerId,
+            UserRole.Manager,
+            errorCode: "NotManager",
+            errorMessage: "Only managers can reject at this stage.",
+            ct);
+
+        if (roleResult.IsFailure)
+        {
+            return roleResult.Error;
+        }
 
         var result = procurement.RejectByManager(reviewerId, request.Reason);
-        if (result.IsFailure) return result.Error;
+        if (result.IsFailure)
+        {
+            return result.Error;
+        }
 
-        await NotifyUser(procurement.RequesterId, "Request Rejected by Manager",
-            $"'{procurement.Title}' rejected: {request.Reason}", procurement.Id, ct);
+        await NotifyUser(
+            procurement.RequesterId,
+            title: "Request Rejected by Manager",
+            message: $"'{procurement.Title}' rejected: {request.Reason}",
+            referenceId: procurement.Id,
+            ct);
+
         return await SaveAndRespond(procurement, ct);
     }
 
@@ -236,17 +336,37 @@ public sealed class ProcurementService(
         Guid id, Guid approverId, ApprovalRequest request, CancellationToken ct = default)
     {
         var procResult = await GetProcurementOrError(id, ct);
-        if (procResult.IsFailure) return procResult.Error;
+        if (procResult.IsFailure)
+        {
+            return procResult.Error;
+        }
         var procurement = procResult.Value;
 
-        var roleResult = await RequireRole(approverId, UserRole.Finance, "NotFinance", "Only finance can approve at this stage.", ct);
-        if (roleResult.IsFailure) return roleResult.Error;
+        var roleResult = await RequireRole(
+            approverId,
+            UserRole.Finance,
+            errorCode: "NotFinance",
+            errorMessage: "Only finance can approve at this stage.",
+            ct);
+
+        if (roleResult.IsFailure)
+        {
+            return roleResult.Error;
+        }
 
         var result = procurement.ApproveByFinance(approverId, request.Comment);
-        if (result.IsFailure) return result.Error;
+        if (result.IsFailure)
+        {
+            return result.Error;
+        }
 
-        await NotifyUser(procurement.RequesterId, "Request Approved by Finance",
-            $"'{procurement.Title}' fully approved. Ready for PO.", procurement.Id, ct);
+        await NotifyUser(
+            procurement.RequesterId,
+            title: "Request Approved by Finance",
+            message: $"'{procurement.Title}' fully approved. Ready for PO.",
+            referenceId: procurement.Id,
+            ct);
+
         return await SaveAndRespond(procurement, ct);
     }
 
@@ -254,17 +374,37 @@ public sealed class ProcurementService(
         Guid id, Guid reviewerId, RejectionRequest request, CancellationToken ct = default)
     {
         var procResult = await GetProcurementOrError(id, ct);
-        if (procResult.IsFailure) return procResult.Error;
+        if (procResult.IsFailure)
+        {
+            return procResult.Error;
+        }
         var procurement = procResult.Value;
 
-        var roleResult = await RequireRole(reviewerId, UserRole.Finance, "NotFinance", "Only finance can reject at this stage.", ct);
-        if (roleResult.IsFailure) return roleResult.Error;
+        var roleResult = await RequireRole(
+            reviewerId,
+            UserRole.Finance,
+            errorCode: "NotFinance",
+            errorMessage: "Only finance can reject at this stage.",
+            ct);
+
+        if (roleResult.IsFailure)
+        {
+            return roleResult.Error;
+        }
 
         var result = procurement.RejectByFinance(reviewerId, request.Reason);
-        if (result.IsFailure) return result.Error;
+        if (result.IsFailure)
+        {
+            return result.Error;
+        }
 
-        await NotifyUser(procurement.RequesterId, "Request Rejected by Finance",
-            $"'{procurement.Title}' rejected by finance: {request.Reason}", procurement.Id, ct);
+        await NotifyUser(
+            procurement.RequesterId,
+            title: "Request Rejected by Finance",
+            message: $"'{procurement.Title}' rejected by finance: {request.Reason}",
+            referenceId: procurement.Id,
+            ct);
+
         return await SaveAndRespond(procurement, ct);
     }
 
@@ -272,17 +412,37 @@ public sealed class ProcurementService(
         Guid id, Guid issuerId, CancellationToken ct = default)
     {
         var procResult = await GetProcurementOrError(id, ct);
-        if (procResult.IsFailure) return procResult.Error;
+        if (procResult.IsFailure)
+        {
+            return procResult.Error;
+        }
         var procurement = procResult.Value;
 
-        var roleResult = await RequireRole(issuerId, UserRole.Finance, "NotFinance", "Only finance can issue purchase orders.", ct);
-        if (roleResult.IsFailure) return roleResult.Error;
+        var roleResult = await RequireRole(
+            issuerId,
+            UserRole.Finance,
+            errorCode: "NotFinance",
+            errorMessage: "Only finance can issue purchase orders.",
+            ct);
+
+        if (roleResult.IsFailure)
+        {
+            return roleResult.Error;
+        }
 
         var result = procurement.IssuePurchaseOrder(issuerId);
-        if (result.IsFailure) return result.Error;
+        if (result.IsFailure)
+        {
+            return result.Error;
+        }
 
-        await NotifyUser(procurement.RequesterId, "Purchase Order Issued",
-            $"PO #{procurement.PoNumber} issued for '{procurement.Title}'.", procurement.Id, ct);
+        await NotifyUser(
+            procurement.RequesterId,
+            title: "Purchase Order Issued",
+            message: $"PO #{procurement.PoNumber} issued for '{procurement.Title}'.",
+            referenceId: procurement.Id,
+            ct);
+
         return await SaveAndRespond(procurement, ct);
     }
 
@@ -291,10 +451,15 @@ public sealed class ProcurementService(
     {
         var procurement = await procurementRepo.GetByIdAsync(id, ct);
         if (procurement is null)
-            return Error.NotFound("Procurement", $"Procurement request {id} not found.");
+        {
+            return Error.NotFound(code: "Procurement", message: $"Procurement request {id} not found.");
+        }
 
         var result = procurement.ReviseToDraft(requesterId);
-        if (result.IsFailure) return result.Error;
+        if (result.IsFailure)
+        {
+            return result.Error;
+        }
 
         await procurementRepo.UpdateAsync(procurement, ct);
         await unitOfWork.SaveChangesAsync(ct);
@@ -308,16 +473,23 @@ public sealed class ProcurementService(
     {
         var user = await userRepo.GetByIdAsync(userId, ct);
         if (user is null)
-            return Error.NotFound("User", "User not found.");
+        {
+            return Error.NotFound(code: "User", message: "User not found.");
+        }
 
         var procurement = await procurementRepo.GetByIdAsync(id, ct);
         if (procurement is null)
-            return Error.NotFound("Procurement", $"Procurement request {id} not found.");
+        {
+            return Error.NotFound(code: "Procurement", message: $"Procurement request {id} not found.");
+        }
 
         if (!CanView(user, procurement))
-            return Error.Unauthorized("AccessDenied", "You do not have access to this procurement request.");
+        {
+            return Error.Unauthorized(code: "AccessDenied", message: "You do not have access to this procurement request.");
+        }
 
         var comment = procurement.AddComment(userId, request.Text);
+
         await procurementRepo.UpdateAsync(procurement, ct);
         await unitOfWork.SaveChangesAsync(ct);
 
@@ -327,7 +499,10 @@ public sealed class ProcurementService(
     public async Task<Result<DashboardMetrics>> GetMetricsForUserAsync(Guid userId, CancellationToken ct = default)
     {
         var userResult = await GetUserOrError(userId, ct);
-        if (userResult.IsFailure) return userResult.Error;
+        if (userResult.IsFailure)
+        {
+            return userResult.Error;
+        }
         var user = userResult.Value;
 
         return await procurementRepo.GetMetricsAsync(user.Id, user.Role, ct);
@@ -337,7 +512,7 @@ public sealed class ProcurementService(
     {
         var user = await userRepo.GetByIdAsync(userId, ct);
         return user is null
-            ? Error.NotFound("User", "User not found.")
+            ? Error.NotFound(code: "User", message: "User not found.")
             : user;
     }
 
@@ -359,7 +534,7 @@ public sealed class ProcurementService(
     {
         var procurement = await procurementRepo.GetByIdAsync(id, ct);
         return procurement is null
-            ? Error.NotFound("Procurement", $"Procurement request {id} not found.")
+            ? Error.NotFound(code: "Procurement", message: $"Procurement request {id} not found.")
             : procurement;
     }
 
@@ -368,13 +543,14 @@ public sealed class ProcurementService(
         var user = await userRepo.GetByIdAsync(userId, ct);
         return user?.Role is var role && (role == requiredRole || role == UserRole.Admin)
             ? user!
-            : Error.Unauthorized(errorCode, errorMessage);
+            : Error.Unauthorized(code: errorCode, message: errorMessage);
     }
 
     private async Task<Result<ProcurementResponse>> SaveAndRespond(ProcurementRequest procurement, CancellationToken ct)
     {
         await procurementRepo.UpdateAsync(procurement, ct);
         await unitOfWork.SaveChangesAsync(ct);
+
         var requester = await userRepo.GetByIdAsync(procurement.RequesterId, ct);
         return await MapToResponseAsync(procurement, requester!, ct);
     }
@@ -393,7 +569,9 @@ public sealed class ProcurementService(
         {
             var users = await userRepo.GetByIdsAsync(userIds, ct);
             foreach (var user in users)
+            {
                 userLookup[user.Id] = user.Name;
+            }
         }
 
         return new ProcurementResponse(
@@ -423,8 +601,10 @@ public sealed class ProcurementService(
     {
         var users = await userRepo.GetByRoleAsync(role, ct);
         foreach (var user in users)
+        {
             await notificationRepo.AddAsync(
                 Notification.Create(user.Id, title, message, referenceId), ct);
+        }
     }
 
     private async Task NotifyUser(

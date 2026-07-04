@@ -22,7 +22,10 @@ public sealed class UsersController(IUserRepository userRepo) : ControllerBase
     public async Task<ActionResult<UserResponse>> GetById(Guid id, CancellationToken ct)
     {
         var user = await userRepo.GetByIdAsync(id, ct);
-        if (user is null) return NotFound();
+        if (user is null)
+        {
+            return NotFound();
+        }
         return Ok(new UserResponse(user.Id, user.Name, user.Email, user.Role.ToString(), user.Department.ToString()));
     }
 }

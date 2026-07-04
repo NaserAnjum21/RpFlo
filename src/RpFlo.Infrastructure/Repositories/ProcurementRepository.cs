@@ -126,21 +126,27 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
         {
             var entry = db.Entry(audit);
             if (entry.State is not EntityState.Unchanged)
+            {
                 entry.State = EntityState.Added;
+            }
         }
 
         foreach (var comment in request.Comments)
         {
             var entry = db.Entry(comment);
             if (entry.State is not EntityState.Unchanged)
+            {
                 entry.State = EntityState.Added;
+            }
         }
 
         foreach (var lineItem in request.LineItems)
         {
             var entry = db.Entry(lineItem);
             if (entry.State is not EntityState.Unchanged)
+            {
                 entry.State = EntityState.Added;
+            }
         }
 
         return Task.CompletedTask;
@@ -150,7 +156,9 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
     {
         var item = await db.LineItems.FindAsync([lineItemId], ct);
         if (item is not null)
+        {
             db.LineItems.Remove(item);
+        }
     }
 
     public async Task<DashboardMetrics> GetMetricsAsync(Guid userId, UserRole role, CancellationToken ct = default)
@@ -169,6 +177,7 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
             statuses.Sum(s => counts.GetValueOrDefault(s));
 
         var approvedStatuses = new[] { ProcurementStatus.FinanceApproved, ProcurementStatus.PurchaseOrderIssued };
+
         var totalApproved = await visibleRequests
             .Where(p => approvedStatuses.Contains(p.Status))
             .SelectMany(p => p.LineItems)
@@ -223,7 +232,8 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
 
     private async Task<RoleMetrics> ComputeRoleMetrics(Guid userId, UserRole role, CancellationToken ct)
     {
-        var monthStart = new DateTimeOffset(DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
+        var monthStart = new DateTimeOffset(
+            DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
 
         var userRequests = db.ProcurementRequests.AsNoTracking()
             .Where(p => p.RequesterId == userId);
@@ -234,6 +244,7 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
             .ToListAsync(ct);
 
         var myCounts = myStatusCounts.ToDictionary(s => s.Status, s => s.Count);
+
         int MyCount(params ProcurementStatus[] statuses) =>
             statuses.Sum(s => myCounts.GetValueOrDefault(s));
 
@@ -281,6 +292,7 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
             : 0;
 
         var pendingFinanceStatuses = new[] { ProcurementStatus.ManagerApproved, ProcurementStatus.FinanceApproved };
+
         var totalValuePending = role is UserRole.Finance or UserRole.Admin
             ? await db.ProcurementRequests.AsNoTracking()
                 .Where(p => pendingFinanceStatuses.Contains(p.Status))
@@ -331,7 +343,9 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
         };
 
         if (statuses.Length > 0)
+        {
             query = query.Where(p => statuses.Contains(p.Status));
+        }
 
         return ApplyDateFilters(query, pageQuery.DateFrom, pageQuery.DateTo);
     }

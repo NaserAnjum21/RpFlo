@@ -32,7 +32,9 @@ public sealed class NotificationsController(INotificationRepository notification
     {
         var marked = await notificationRepo.MarkAsReadAsync(id, userId, ct);
         if (!marked)
+        {
             return NotFound();
+        }
 
         await unitOfWork.SaveChangesAsync(ct);
         return NoContent();

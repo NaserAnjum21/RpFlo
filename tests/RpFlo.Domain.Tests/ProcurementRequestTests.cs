@@ -14,7 +14,7 @@ public class ProcurementRequestTests
     private static ProcurementRequest CreateDraftWithItems()
     {
         var pr = ProcurementRequest.Create("Test", "Description", Department.Engineering, Urgency.Medium, RequesterId);
-        pr.AddLineItem("Item 1", 2, 100m);
+        pr.AddLineItem(name: "Item 1", quantity: 2, unitPrice: 100m);
         return pr;
     }
 
@@ -32,7 +32,8 @@ public class ProcurementRequestTests
     public void AddLineItem_InDraft_ShouldSucceed()
     {
         var pr = ProcurementRequest.Create("Test", "Desc", Department.Engineering, Urgency.Low, RequesterId);
-        var result = pr.AddLineItem("Laptop", 5, 1000m);
+
+        var result = pr.AddLineItem(name: "Laptop", quantity: 5, unitPrice: 1000m);
 
         result.IsSuccess.Should().BeTrue();
         pr.LineItems.Should().HaveCount(1);
@@ -45,7 +46,7 @@ public class ProcurementRequestTests
         var pr = CreateDraftWithItems();
         pr.Submit(RequesterId);
 
-        var result = pr.AddLineItem("Extra", 1, 50m);
+        var result = pr.AddLineItem(name: "Extra", quantity: 1, unitPrice: 50m);
 
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be("Domain.CannotModify");
@@ -74,11 +75,13 @@ public class ProcurementRequestTests
     public void Submit_WithLineItems_ShouldTransitionToSubmitted()
     {
         var pr = CreateDraftWithItems();
+
         var result = pr.Submit(RequesterId);
 
         result.IsSuccess.Should().BeTrue();
         pr.Status.Should().Be(ProcurementStatus.Submitted);
         pr.AuditEntries.Should().HaveCount(1);
+
         pr.AuditEntries[0].Should().BeEquivalentTo(new
         {
             UserId = RequesterId,
@@ -92,6 +95,7 @@ public class ProcurementRequestTests
     public void Submit_WithoutLineItems_ShouldFail()
     {
         var pr = ProcurementRequest.Create("Test", "Desc", Department.Engineering, Urgency.Low, RequesterId);
+
         var result = pr.Submit(RequesterId);
 
         result.IsFailure.Should().BeTrue();
@@ -103,6 +107,7 @@ public class ProcurementRequestTests
     public void Submit_ByNonOwner_ShouldFail()
     {
         var pr = CreateDraftWithItems();
+
         var result = pr.Submit(Guid.NewGuid());
 
         result.IsFailure.Should().BeTrue();
@@ -121,6 +126,7 @@ public class ProcurementRequestTests
         result.IsSuccess.Should().BeTrue();
         pr.Status.Should().Be(ProcurementStatus.ManagerApproved);
         pr.AuditEntries.Should().HaveCount(2);
+
         pr.AuditEntries[^1].Should().BeEquivalentTo(new
         {
             UserId = ManagerId,
@@ -135,6 +141,7 @@ public class ProcurementRequestTests
     public void ApproveByManager_FromDraft_ShouldFail()
     {
         var pr = CreateDraftWithItems();
+
         var result = pr.ApproveByManager(ManagerId);
 
         result.IsFailure.Should().BeTrue();
@@ -286,6 +293,7 @@ public class ProcurementRequestTests
     public void AddComment_ShouldWork()
     {
         var pr = CreateDraftWithItems();
+
         var comment = pr.AddComment(RequesterId, "Need this urgently");
 
         comment.Text.Should().Be("Need this urgently");
@@ -296,6 +304,7 @@ public class ProcurementRequestTests
     public void Update_InDraft_ShouldSucceed()
     {
         var pr = CreateDraftWithItems();
+
         var result = pr.Update("New Title", "New Desc", Department.Marketing, Urgency.Critical);
 
         result.IsSuccess.Should().BeTrue();
@@ -333,6 +342,7 @@ public class ProcurementRequestTests
     public void RemoveLineItem_NotFound_ShouldFail()
     {
         var pr = CreateDraftWithItems();
+
         var result = pr.RemoveLineItem(Guid.NewGuid());
 
         result.IsFailure.Should().BeTrue();
@@ -361,6 +371,7 @@ public class ProcurementRequestTests
 
         var domainEvent = pr.DomainEvents.Should().ContainSingle().Subject
             .Should().BeOfType<ProcurementSubmitted>().Subject;
+
         domainEvent.RequestId.Should().Be(pr.Id);
         domainEvent.RequesterId.Should().Be(RequesterId);
 
@@ -372,8 +383,8 @@ public class ProcurementRequestTests
     public void TotalAmount_ShouldSumLineItems()
     {
         var pr = ProcurementRequest.Create("Test", "Desc", Department.Engineering, Urgency.Low, RequesterId);
-        pr.AddLineItem("A", 2, 100m);
-        pr.AddLineItem("B", 3, 50m);
+        pr.AddLineItem(name: "A", quantity: 2, unitPrice: 100m);
+        pr.AddLineItem(name: "B", quantity: 3, unitPrice: 50m);
 
         pr.TotalAmount.Amount.Should().Be(350m);
     }
