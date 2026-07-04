@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -264,6 +265,11 @@ public class ApiIntegrationTests : IAsyncLifetime
             $"/api/procurement/{created!.Id}/comments",
             new AddCommentRequest("Need this ASAP"));
         commentResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var comment = await commentResponse.Content.ReadFromJsonAsync<CommentResponse>();
+        comment.Should().NotBeNull();
+        comment!.Text.Should().Be("Need this ASAP");
+        comment.UserId.Should().Be(Guid.Parse(RequesterId));
     }
 
     [Fact]
@@ -323,6 +329,9 @@ public class ApiIntegrationTests : IAsyncLifetime
         var response = await _client.GetAsync("/api/export/csv");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         response.Content.Headers.ContentType!.MediaType.Should().Be("text/csv");
+
+        var csv = await response.Content.ReadAsStringAsync();
+        csv.Should().StartWith("Id,Title,Department,Urgency,Status,TotalAmount,Currency,Requester,CreatedAt,UpdatedAt");
     }
 
     [Fact]
@@ -339,5 +348,31 @@ public class ApiIntegrationTests : IAsyncLifetime
 
         var response = await _client.PostAsJsonAsync("/api/procurement", request);
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        json.RootElement.GetProperty("type").GetString().Should().Be("ValidationError");
+        var errors = json.RootElement.GetProperty("errors");
+        errors.TryGetProperty("Title", out _).Should().BeTrue();
+        errors.TryGetProperty("Description", out _).Should().BeTrue();
+        errors.TryGetProperty("LineItems", out _).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CreateProcurement_MissingUserHeader_ShouldReturn401()
+    {
+        _client.DefaultRequestHeaders.Remove("X-User-Id");
+
+        var request = new CreateProcurementRequest(
+            "Missing Header Test",
+            "Should be rejected before hitting the controller",
+            Domain.Enums.Department.Engineering,
+            Domain.Enums.Urgency.Low,
+            [new("Item", 1, 10m)]);
+
+        var response = await _client.PostAsJsonAsync("/api/procurement", request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        json.RootElement.GetProperty("code").GetString().Should().Be("Unauthorized.MissingUserId");
     }
 }

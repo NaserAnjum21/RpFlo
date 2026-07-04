@@ -1,6 +1,7 @@
 using FluentAssertions;
 using RpFlo.Domain.Entities;
 using RpFlo.Domain.Enums;
+using RpFlo.Domain.Events;
 
 namespace RpFlo.Domain.Tests;
 
@@ -47,22 +48,25 @@ public class ProcurementRequestTests
         var result = pr.AddLineItem("Extra", 1, 50m);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Contain("CannotModify");
+        result.Error.Code.Should().Be("Domain.CannotModify");
+        pr.LineItems.Should().HaveCount(1);
     }
 
     [Theory]
-    [InlineData("", 1, 10)]
-    [InlineData("Item", 0, 10)]
-    [InlineData("Item", 1, 0)]
-    [InlineData("Item", -1, 10)]
-    [InlineData("Item", 1, -10)]
-    public void AddLineItem_InvalidValues_ShouldFail(string name, int quantity, decimal unitPrice)
+    [InlineData("", 1, 10, "Validation.LineItemNameRequired")]
+    [InlineData("   ", 1, 10, "Validation.LineItemNameRequired")]
+    [InlineData("Item", 0, 10, "Validation.InvalidQuantity")]
+    [InlineData("Item", 1, 0, "Validation.InvalidUnitPrice")]
+    [InlineData("Item", -1, 10, "Validation.InvalidQuantity")]
+    [InlineData("Item", 1, -10, "Validation.InvalidUnitPrice")]
+    public void AddLineItem_InvalidValues_ShouldFail(string name, int quantity, decimal unitPrice, string expectedErrorCode)
     {
         var pr = ProcurementRequest.Create("Test", "Desc", Department.Engineering, Urgency.Low, RequesterId);
 
         var result = pr.AddLineItem(name, quantity, unitPrice);
 
         result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be(expectedErrorCode);
         pr.LineItems.Should().BeEmpty();
     }
 
@@ -75,6 +79,13 @@ public class ProcurementRequestTests
         result.IsSuccess.Should().BeTrue();
         pr.Status.Should().Be(ProcurementStatus.Submitted);
         pr.AuditEntries.Should().HaveCount(1);
+        pr.AuditEntries[0].Should().BeEquivalentTo(new
+        {
+            UserId = RequesterId,
+            Action = "Submitted",
+            FromStatus = ProcurementStatus.Draft,
+            ToStatus = ProcurementStatus.Submitted
+        });
     }
 
     [Fact]
@@ -84,7 +95,8 @@ public class ProcurementRequestTests
         var result = pr.Submit(RequesterId);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Contain("NoLineItems");
+        result.Error.Code.Should().Be("Validation.NoLineItems");
+        pr.Status.Should().Be(ProcurementStatus.Draft);
     }
 
     [Fact]
@@ -94,7 +106,8 @@ public class ProcurementRequestTests
         var result = pr.Submit(Guid.NewGuid());
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Contain("NotOwner");
+        result.Error.Code.Should().Be("Unauthorized.NotOwner");
+        pr.Status.Should().Be(ProcurementStatus.Draft);
     }
 
     [Fact]
@@ -108,6 +121,14 @@ public class ProcurementRequestTests
         result.IsSuccess.Should().BeTrue();
         pr.Status.Should().Be(ProcurementStatus.ManagerApproved);
         pr.AuditEntries.Should().HaveCount(2);
+        pr.AuditEntries[^1].Should().BeEquivalentTo(new
+        {
+            UserId = ManagerId,
+            Action = "Manager Approved",
+            FromStatus = ProcurementStatus.Submitted,
+            ToStatus = ProcurementStatus.ManagerApproved,
+            Comment = "Looks good"
+        });
     }
 
     [Fact]
@@ -117,7 +138,8 @@ public class ProcurementRequestTests
         var result = pr.ApproveByManager(ManagerId);
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Contain("InvalidTransition");
+        result.Error.Code.Should().Be("Domain.InvalidTransition");
+        pr.Status.Should().Be(ProcurementStatus.Draft);
     }
 
     [Fact]
@@ -130,6 +152,7 @@ public class ProcurementRequestTests
 
         result.IsSuccess.Should().BeTrue();
         pr.Status.Should().Be(ProcurementStatus.ManagerRejected);
+        pr.AuditEntries[^1].Comment.Should().Be("Need more details");
     }
 
     [Fact]
@@ -154,6 +177,8 @@ public class ProcurementRequestTests
         var result = pr.ApproveByFinance(FinanceId);
 
         result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Domain.InvalidTransition");
+        pr.Status.Should().Be(ProcurementStatus.Submitted);
     }
 
     [Fact]
@@ -170,6 +195,7 @@ public class ProcurementRequestTests
         pr.Status.Should().Be(ProcurementStatus.PurchaseOrderIssued);
         pr.PoNumber.Should().NotBeNullOrEmpty();
         pr.PoNumber.Should().StartWith("PO-");
+        pr.AuditEntries[^1].Comment.Should().Be($"PO Number: {pr.PoNumber}");
     }
 
     [Fact]
@@ -208,6 +234,8 @@ public class ProcurementRequestTests
         var result = pr.ReviseToDraft(RequesterId);
 
         result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Domain.InvalidRevision");
+        pr.Status.Should().Be(ProcurementStatus.Submitted);
     }
 
     [Fact]
@@ -220,7 +248,8 @@ public class ProcurementRequestTests
         var result = pr.ReviseToDraft(Guid.NewGuid());
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Contain("NotOwner");
+        result.Error.Code.Should().Be("Unauthorized.NotOwner");
+        pr.Status.Should().Be(ProcurementStatus.ManagerRejected);
     }
 
     [Fact]
@@ -283,6 +312,9 @@ public class ProcurementRequestTests
         var result = pr.Update("New Title", "New Desc", Department.Marketing, Urgency.Critical);
 
         result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Domain.CannotModify");
+        pr.Title.Should().Be("Test");
+        pr.Department.Should().Be(Department.Engineering);
     }
 
     [Fact]
@@ -304,7 +336,21 @@ public class ProcurementRequestTests
         var result = pr.RemoveLineItem(Guid.NewGuid());
 
         result.IsFailure.Should().BeTrue();
-        result.Error.Code.Should().Contain("NotFound");
+        result.Error.Code.Should().Be("NotFound.LineItem");
+    }
+
+    [Fact]
+    public void RemoveLineItem_NotInDraft_ShouldFail()
+    {
+        var pr = CreateDraftWithItems();
+        var itemId = pr.LineItems[0].Id;
+        pr.Submit(RequesterId);
+
+        var result = pr.RemoveLineItem(itemId);
+
+        result.IsFailure.Should().BeTrue();
+        result.Error.Code.Should().Be("Domain.CannotModify");
+        pr.LineItems.Should().HaveCount(1);
     }
 
     [Fact]
@@ -313,7 +359,11 @@ public class ProcurementRequestTests
         var pr = CreateDraftWithItems();
         pr.Submit(RequesterId);
 
-        pr.DomainEvents.Should().HaveCount(1);
+        var domainEvent = pr.DomainEvents.Should().ContainSingle().Subject
+            .Should().BeOfType<ProcurementSubmitted>().Subject;
+        domainEvent.RequestId.Should().Be(pr.Id);
+        domainEvent.RequesterId.Should().Be(RequesterId);
+
         pr.ClearDomainEvents();
         pr.DomainEvents.Should().BeEmpty();
     }
