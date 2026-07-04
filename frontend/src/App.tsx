@@ -7,7 +7,7 @@ import { Dashboard } from '@/pages/Dashboard';
 import { RequestList } from '@/pages/RequestList';
 import { RequestDetail } from '@/pages/RequestDetail';
 import { CreateRequest } from '@/pages/CreateRequest';
-import { Approvals } from '@/pages/Approvals';
+import { MyTasks } from '@/pages/MyTasks';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,8 +36,7 @@ function AppRoutes() {
         <Route path="/requests" element={<RequestList />} />
         <Route path="/requests/new" element={<CreateRequest />} />
         <Route path="/requests/:id" element={<RequestDetail />} />
-        <Route path="/approvals" element={<Approvals role="Manager" />} />
-        <Route path="/finance" element={<Approvals role="Finance" />} />
+        <Route path="/tasks" element={<MyTasks />} />
       </Routes>
     </Layout>
   );

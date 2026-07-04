@@ -4,11 +4,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard,
   FileText,
-  CheckSquare,
   Bell,
   ChevronDown,
   Menu,
   Download,
+  ClipboardList,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -57,12 +57,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/requests', label: 'Requests', icon: FileText },
-    ...(currentUser?.role === 'Manager' || currentUser?.role === 'Admin'
-      ? [{ path: '/approvals', label: 'Approvals', icon: CheckSquare }]
-      : []),
-    ...(currentUser?.role === 'Finance' || currentUser?.role === 'Admin'
-      ? [{ path: '/finance', label: 'Finance Review', icon: CheckSquare }]
-      : []),
+    { path: '/tasks', label: 'My Tasks', icon: ClipboardList },
   ];
 
   const handleMarkAllRead = async () => {

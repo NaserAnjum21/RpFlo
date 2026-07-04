@@ -10,6 +10,7 @@ import {
   Plus,
   Trash2,
   AlertCircle,
+  FileDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -335,10 +336,19 @@ export function RequestDetail() {
         <Card className="bg-green-50 border-green-200">
           <CardContent className="py-4 flex items-center gap-3">
             <Package className="h-5 w-5 text-green-600" />
-            <div>
+            <div className="flex-1">
               <p className="font-medium text-green-800">Purchase Order Issued</p>
               <p className="text-sm text-green-700">PO Number: {request.poNumber}</p>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-green-300 text-green-700 hover:bg-green-100"
+              onClick={() => window.open(`/api/procurement/${id}/export/pdf`, '_blank')}
+            >
+              <FileDown className="h-4 w-4" />
+              Export PDF
+            </Button>
           </CardContent>
         </Card>
       )}

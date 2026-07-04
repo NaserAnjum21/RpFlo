@@ -14,5 +14,5 @@ public interface IProcurementRepository
     Task<ProcurementRequest> AddAsync(ProcurementRequest request, CancellationToken ct = default);
     Task UpdateAsync(ProcurementRequest request, CancellationToken ct = default);
     Task DeleteLineItemAsync(Guid lineItemId, CancellationToken ct = default);
-    Task<DashboardMetrics> GetMetricsAsync(CancellationToken ct = default);
+    Task<DashboardMetrics> GetMetricsAsync(Guid? userId = null, CancellationToken ct = default);
 }

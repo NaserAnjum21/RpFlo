@@ -88,7 +88,7 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
             db.LineItems.Remove(item);
     }
 
-    public async Task<DashboardMetrics> GetMetricsAsync(CancellationToken ct = default)
+    public async Task<DashboardMetrics> GetMetricsAsync(Guid? userId = null, CancellationToken ct = default)
     {
         var statusCounts = await db.ProcurementRequests
             .GroupBy(p => p.Status)
@@ -120,6 +120,10 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
             .Select(p => (double?)EF.Functions.DateDiffSecond(p.CreatedAt, p.UpdatedAt))
             .AverageAsync(ct) ?? 0;
 
+        RoleMetrics? roleMetrics = null;
+        if (userId.HasValue)
+            roleMetrics = await ComputeRoleMetrics(userId.Value, ct);
+
         return new DashboardMetrics(
             TotalRequests: total,
             DraftCount: Count(ProcurementStatus.Draft),
@@ -130,6 +134,85 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
             TotalApprovedAmount: totalApproved,
             AverageProcessingTimeHours: Math.Round((decimal)(avgHours / 3600.0), 1),
             StatusBreakdown: statusCounts.Select(s => new StatusCount(s.Status.ToString(), s.Count)).ToList(),
-            DepartmentBreakdown: departmentGroups);
+            DepartmentBreakdown: departmentGroups,
+            RoleMetrics: roleMetrics);
+    }
+
+    private async Task<RoleMetrics> ComputeRoleMetrics(Guid userId, CancellationToken ct)
+    {
+        var user = await db.Users.FindAsync([userId], ct);
+        if (user is null)
+            return new RoleMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, [], []);
+
+        var monthStart = new DateTimeOffset(DateTimeOffset.UtcNow.Year, DateTimeOffset.UtcNow.Month, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var myActive = await db.ProcurementRequests
+            .CountAsync(p => p.RequesterId == userId &&
+                p.Status != ProcurementStatus.PurchaseOrderIssued &&
+                p.Status != ProcurementStatus.ManagerRejected &&
+                p.Status != ProcurementStatus.FinanceRejected, ct);
+
+        var myPending = await db.ProcurementRequests
+            .CountAsync(p => p.RequesterId == userId &&
+                (p.Status == ProcurementStatus.Submitted || p.Status == ProcurementStatus.ManagerApproved), ct);
+
+        var myApproved = await db.ProcurementRequests
+            .Where(p => p.RequesterId == userId &&
+                (p.Status == ProcurementStatus.FinanceApproved || p.Status == ProcurementStatus.PurchaseOrderIssued))
+            .SelectMany(p => p.LineItems)
+            .SumAsync(li => (decimal?)li.UnitPrice.Amount * li.Quantity, ct) ?? 0;
+
+        var myAvgHours = await db.ProcurementRequests
+            .Where(p => p.RequesterId == userId && p.Status == ProcurementStatus.PurchaseOrderIssued)
+            .Select(p => (double?)EF.Functions.DateDiffSecond(p.CreatedAt, p.UpdatedAt))
+            .AverageAsync(ct) ?? 0;
+
+        var pendingManagerReview = await db.ProcurementRequests
+            .CountAsync(p => p.Status == ProcurementStatus.Submitted, ct);
+
+        var approvedThisMonth = await db.ProcurementRequests
+            .CountAsync(p => p.Status == ProcurementStatus.PurchaseOrderIssued && p.UpdatedAt >= monthStart, ct);
+
+        var readyForPo = await db.ProcurementRequests
+            .CountAsync(p => p.Status == ProcurementStatus.FinanceApproved, ct);
+
+        var pendingFinanceStatuses = new[] { ProcurementStatus.ManagerApproved, ProcurementStatus.FinanceApproved };
+        var totalValuePending = await db.ProcurementRequests
+            .Where(p => pendingFinanceStatuses.Contains(p.Status))
+            .SelectMany(p => p.LineItems)
+            .SumAsync(li => (decimal?)li.UnitPrice.Amount * li.Quantity, ct) ?? 0;
+
+        var monthlySpend = await db.ProcurementRequests
+            .Where(p => p.Status == ProcurementStatus.PurchaseOrderIssued && p.UpdatedAt >= monthStart)
+            .SelectMany(p => p.LineItems)
+            .SumAsync(li => (decimal?)li.UnitPrice.Amount * li.Quantity, ct) ?? 0;
+
+        var myStatusCounts = await db.ProcurementRequests
+            .Where(p => p.RequesterId == userId)
+            .GroupBy(p => p.Status)
+            .Select(g => new StatusCount(g.Key.ToString(), g.Count()))
+            .ToListAsync(ct);
+
+        var myDeptCounts = await db.ProcurementRequests
+            .Where(p => p.RequesterId == userId)
+            .GroupBy(p => p.Department)
+            .Select(g => new DepartmentCount(
+                g.Key.ToString(),
+                g.Count(),
+                g.SelectMany(p => p.LineItems).Sum(li => li.UnitPrice.Amount * li.Quantity)))
+            .ToListAsync(ct);
+
+        return new RoleMetrics(
+            MyActiveRequests: myActive,
+            MyPendingApproval: myPending,
+            MyApprovedAmount: myApproved,
+            MyAvgProcessingHours: Math.Round((decimal)(myAvgHours / 3600.0), 1),
+            PendingMyReview: pendingManagerReview,
+            ApprovedThisMonth: approvedThisMonth,
+            ReadyForPo: readyForPo,
+            TotalValuePending: totalValuePending,
+            MonthlySpendApproved: monthlySpend,
+            MyStatusBreakdown: myStatusCounts,
+            MyDepartmentBreakdown: myDeptCounts);
     }
 }

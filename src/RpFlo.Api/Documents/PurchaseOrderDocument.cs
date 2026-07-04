@@ -1,0 +1,161 @@
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
+using RpFlo.Application.DTOs;
+
+namespace RpFlo.Api.Documents;
+
+public sealed class PurchaseOrderDocument(ProcurementResponse data) : IDocument
+{
+    public void Compose(IDocumentContainer container)
+    {
+        container.Page(page =>
+        {
+            page.Size(PageSizes.A4);
+            page.Margin(40);
+            page.DefaultTextStyle(x => x.FontSize(10));
+
+            page.Header().Element(ComposeHeader);
+            page.Content().Element(ComposeContent);
+            page.Footer().Element(ComposeFooter);
+        });
+    }
+
+    private void ComposeHeader(IContainer container)
+    {
+        container.Column(col =>
+        {
+            col.Item().Row(row =>
+            {
+                row.RelativeItem().Column(c =>
+                {
+                    c.Item().Text("PURCHASE ORDER").Bold().FontSize(20).FontColor(Colors.Blue.Darken2);
+                    c.Item().Text(data.PoNumber ?? "").FontSize(12).FontColor(Colors.Grey.Darken1);
+                });
+
+                row.ConstantItem(180).AlignRight().Column(c =>
+                {
+                    c.Item().Text("RpFlo ERP").Bold().FontSize(14);
+                    c.Item().Text("Procurement System").FontSize(9).FontColor(Colors.Grey.Darken1);
+                });
+            });
+
+            col.Item().PaddingVertical(8).LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
+        });
+    }
+
+    private void ComposeContent(IContainer container)
+    {
+        container.PaddingVertical(10).Column(col =>
+        {
+            col.Spacing(16);
+
+            col.Item().Row(row =>
+            {
+                row.RelativeItem().Component(new InfoBlock("Request Details", new Dictionary<string, string>
+                {
+                    ["Title"] = data.Title,
+                    ["Department"] = data.Department,
+                    ["Urgency"] = data.Urgency,
+                    ["Status"] = "Purchase Order Issued",
+                }));
+
+                row.ConstantItem(20);
+
+                row.RelativeItem().Component(new InfoBlock("Requester", new Dictionary<string, string>
+                {
+                    ["Name"] = data.Requester.Name,
+                    ["Email"] = data.Requester.Email,
+                    ["Department"] = data.Requester.Department,
+                }));
+            });
+
+            col.Item().Text("Line Items").Bold().FontSize(12);
+            col.Item().Element(ComposeLineItems);
+
+            col.Item().AlignRight().Row(row =>
+            {
+                row.ConstantItem(120).Text("Grand Total:").Bold().FontSize(12);
+                row.ConstantItem(100).AlignRight().Text($"${data.TotalAmount:N2}").Bold().FontSize(12);
+            });
+
+            if (!string.IsNullOrWhiteSpace(data.Description))
+            {
+                col.Item().PaddingTop(10).Text("Description").Bold().FontSize(12);
+                col.Item().Text(data.Description).FontSize(9).FontColor(Colors.Grey.Darken1);
+            }
+        });
+    }
+
+    private void ComposeLineItems(IContainer container)
+    {
+        container.Table(table =>
+        {
+            table.ColumnsDefinition(cols =>
+            {
+                cols.RelativeColumn(3);
+                cols.ConstantColumn(60);
+                cols.ConstantColumn(80);
+                cols.ConstantColumn(90);
+            });
+
+            table.Header(header =>
+            {
+                static IContainer CellStyle(IContainer c) =>
+                    c.DefaultTextStyle(x => x.Bold().FontSize(9))
+                     .PaddingVertical(5)
+                     .BorderBottom(1)
+                     .BorderColor(Colors.Grey.Lighten1);
+
+                header.Cell().Element(CellStyle).Text("Item");
+                header.Cell().Element(CellStyle).AlignRight().Text("Qty");
+                header.Cell().Element(CellStyle).AlignRight().Text("Unit Price");
+                header.Cell().Element(CellStyle).AlignRight().Text("Total");
+            });
+
+            foreach (var item in data.LineItems)
+            {
+                static IContainer CellStyle(IContainer c) =>
+                    c.PaddingVertical(4)
+                     .BorderBottom(0.5f)
+                     .BorderColor(Colors.Grey.Lighten3);
+
+                table.Cell().Element(CellStyle).Text(item.Name).FontSize(9);
+                table.Cell().Element(CellStyle).AlignRight().Text(item.Quantity.ToString()).FontSize(9);
+                table.Cell().Element(CellStyle).AlignRight().Text($"${item.UnitPrice:N2}").FontSize(9);
+                table.Cell().Element(CellStyle).AlignRight().Text($"${item.TotalPrice:N2}").FontSize(9).Bold();
+            }
+        });
+    }
+
+    private void ComposeFooter(IContainer container)
+    {
+        container.AlignCenter().Text(text =>
+        {
+            text.DefaultTextStyle(x => x.FontSize(8).FontColor(Colors.Grey.Medium));
+            text.Span("Generated by RpFlo ERP · ");
+            text.CurrentPageNumber();
+            text.Span(" of ");
+            text.TotalPages();
+        });
+    }
+
+    private sealed class InfoBlock(string title, Dictionary<string, string> items) : IComponent
+    {
+        public void Compose(IContainer container)
+        {
+            container.Column(col =>
+            {
+                col.Item().PaddingBottom(4).Text(title).Bold().FontSize(11);
+                foreach (var (key, value) in items)
+                {
+                    col.Item().Row(row =>
+                    {
+                        row.ConstantItem(80).Text(key).FontSize(9).FontColor(Colors.Grey.Darken1);
+                        row.RelativeItem().Text(value).FontSize(9);
+                    });
+                }
+            });
+        }
+    }
+}

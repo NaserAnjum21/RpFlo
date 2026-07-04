@@ -10,7 +10,21 @@ public sealed record DashboardMetrics(
     decimal TotalApprovedAmount,
     decimal AverageProcessingTimeHours,
     List<StatusCount> StatusBreakdown,
-    List<DepartmentCount> DepartmentBreakdown);
+    List<DepartmentCount> DepartmentBreakdown,
+    RoleMetrics? RoleMetrics = null);
+
+public sealed record RoleMetrics(
+    int MyActiveRequests,
+    int MyPendingApproval,
+    decimal MyApprovedAmount,
+    decimal MyAvgProcessingHours,
+    int PendingMyReview,
+    int ApprovedThisMonth,
+    int ReadyForPo,
+    decimal TotalValuePending,
+    decimal MonthlySpendApproved,
+    List<StatusCount> MyStatusBreakdown,
+    List<DepartmentCount> MyDepartmentBreakdown);
 
 public sealed record StatusCount(string Status, int Count);
 public sealed record DepartmentCount(string Department, int Count, decimal TotalAmount);

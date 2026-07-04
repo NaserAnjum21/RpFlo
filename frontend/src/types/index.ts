@@ -93,6 +93,21 @@ export interface DashboardMetrics {
   averageProcessingTimeHours: number;
   statusBreakdown: { status: string; count: number }[];
   departmentBreakdown: { department: string; count: number; totalAmount: number }[];
+  roleMetrics: RoleMetrics | null;
+}
+
+export interface RoleMetrics {
+  myActiveRequests: number;
+  myPendingApproval: number;
+  myApprovedAmount: number;
+  myAvgProcessingHours: number;
+  pendingMyReview: number;
+  approvedThisMonth: number;
+  readyForPo: number;
+  totalValuePending: number;
+  monthlySpendApproved: number;
+  myStatusBreakdown: { status: string; count: number }[];
+  myDepartmentBreakdown: { department: string; count: number; totalAmount: number }[];
 }
 
 export interface NotificationResponse {

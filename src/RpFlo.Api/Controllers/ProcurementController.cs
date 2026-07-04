@@ -1,5 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using QuestPDF.Fluent;
+using RpFlo.Api.Documents;
 using RpFlo.Application.DTOs;
 using RpFlo.Application.Services;
 using RpFlo.Domain.Common;
@@ -145,8 +147,27 @@ public sealed class ProcurementController(
     }
 
     [HttpGet("metrics")]
-    public async Task<ActionResult<DashboardMetrics>> GetMetrics(CancellationToken ct) =>
-        Ok(await service.GetMetricsAsync(ct));
+    public async Task<ActionResult<DashboardMetrics>> GetMetrics(
+        [FromHeader(Name = "X-User-Id")] Guid? userId,
+        CancellationToken ct) =>
+        Ok(await service.GetMetricsAsync(userId, ct));
+
+    [HttpGet("{id:guid}/export/pdf")]
+    public async Task<IActionResult> ExportPdf(Guid id, CancellationToken ct)
+    {
+        var result = await service.GetByIdAsync(id, ct);
+        return result.Match<IActionResult>(
+            procurement =>
+            {
+                if (procurement.Status != "PurchaseOrderIssued")
+                    return BadRequest(new { Code = "InvalidExport", Message = "PDF export is only available for issued purchase orders." });
+
+                var document = new PurchaseOrderDocument(procurement);
+                var pdf = document.GeneratePdf();
+                return File(pdf, "application/pdf");
+            },
+            error => error.Code.StartsWith("NotFound") ? NotFound(new { error.Code, error.Message }) : BadRequest(new { error.Code, error.Message }));
+    }
 
     private ActionResult<T> ToActionResult<T>(Result<T> result, int successCode = StatusCodes.Status200OK) =>
         result.Match<ActionResult<T>>(

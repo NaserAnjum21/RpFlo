@@ -1,8 +1,11 @@
 using System.Text.Json.Serialization;
 using FluentValidation;
+using QuestPDF.Infrastructure;
 using RpFlo.Application;
 using RpFlo.Infrastructure;
 using RpFlo.Infrastructure.Persistence;
+
+QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
 

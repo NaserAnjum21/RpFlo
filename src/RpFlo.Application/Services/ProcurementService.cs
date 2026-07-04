@@ -100,8 +100,37 @@ public sealed class ProcurementService(
         if (user is null)
             return Error.NotFound("User", "User not found.");
 
-        var pending = await GetPendingForRoleAsync(user.Role, ct);
-        return Result<IReadOnlyList<ProcurementListItem>>.Success(pending);
+        var items = new List<ProcurementListItem>();
+
+        if (user.Role is UserRole.Requester)
+        {
+            var myRequests = await procurementRepo.GetByRequesterIdAsync(userId, ct);
+            var actionable = myRequests.Where(p =>
+                p.Status is ProcurementStatus.Draft
+                    or ProcurementStatus.ManagerRejected
+                    or ProcurementStatus.FinanceRejected);
+            items.AddRange(actionable.Select(p => MapToListItem(p, user)));
+        }
+
+        if (user.Role is UserRole.Manager or UserRole.Admin)
+        {
+            var submitted = await procurementRepo.GetByStatusAsync(ProcurementStatus.Submitted, ct);
+            var users = await userRepo.GetAllAsync(ct);
+            var userMap = users.ToDictionary(u => u.Id);
+            items.AddRange(submitted.Select(p => MapToListItem(p, userMap.GetValueOrDefault(p.RequesterId))));
+        }
+
+        if (user.Role is UserRole.Finance or UserRole.Admin)
+        {
+            var managerApproved = await procurementRepo.GetByStatusAsync(ProcurementStatus.ManagerApproved, ct);
+            var financeApproved = await procurementRepo.GetByStatusAsync(ProcurementStatus.FinanceApproved, ct);
+            var users = await userRepo.GetAllAsync(ct);
+            var userMap = users.ToDictionary(u => u.Id);
+            items.AddRange(managerApproved.Select(p => MapToListItem(p, userMap.GetValueOrDefault(p.RequesterId))));
+            items.AddRange(financeApproved.Select(p => MapToListItem(p, userMap.GetValueOrDefault(p.RequesterId))));
+        }
+
+        return Result<IReadOnlyList<ProcurementListItem>>.Success(items);
     }
 
     public async Task<Result<ProcurementResponse>> UpdateAsync(
@@ -323,8 +352,8 @@ public sealed class ProcurementService(
         return new CommentResponse(comment.Id, userId, user.Name, comment.Text, comment.CreatedAt);
     }
 
-    public async Task<DashboardMetrics> GetMetricsAsync(CancellationToken ct = default) =>
-        await procurementRepo.GetMetricsAsync(ct);
+    public async Task<DashboardMetrics> GetMetricsAsync(Guid? userId = null, CancellationToken ct = default) =>
+        await procurementRepo.GetMetricsAsync(userId, ct);
 
     private async Task<Result<ProcurementRequest>> GetProcurementOrError(Guid id, CancellationToken ct)
     {
