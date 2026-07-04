@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Sheet, SheetContent, SheetHeader, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { notificationsApi } from '@/api/users';
 import { procurementApi } from '@/api/procurement';
@@ -61,13 +62,30 @@ export function Layout({ children }: { children: ReactNode }) {
   ];
 
   const handleMarkAllRead = async () => {
-    await notificationsApi.markAllAsRead();
-    queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    try {
+      await notificationsApi.markAllAsRead();
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    } catch {
+      toast.error('Failed to mark notifications as read');
+    }
   };
 
   const handleMarkRead = async (id: string) => {
-    await notificationsApi.markAsRead(id);
-    queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    try {
+      await notificationsApi.markAsRead(id);
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    } catch {
+      toast.error('Failed to mark notification as read');
+    }
+  };
+
+  const handleExportCsv = async () => {
+    try {
+      await procurementApi.exportCsv();
+      toast.success('CSV exported');
+    } catch {
+      toast.error('Failed to export CSV');
+    }
   };
 
   if (authError) {
@@ -112,7 +130,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => procurementApi.exportCsv()}
+              onClick={handleExportCsv}
               className="hidden md:flex gap-1"
             >
               <Download className="h-4 w-4" />

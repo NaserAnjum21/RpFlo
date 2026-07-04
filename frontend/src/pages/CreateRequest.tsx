@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { toast } from 'sonner';
 import { procurementApi } from '@/api/procurement';
 import type { CreateProcurementRequest } from '@/types';
 
@@ -43,12 +44,14 @@ export function CreateRequest() {
     mutationFn: (data: CreateProcurementRequest) => procurementApi.create(data),
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['procurement'] });
+      toast.success('Request created');
       navigate(`/requests/${response.id}`);
     },
     onError: (error: any) => {
       if (error.response?.data?.errors) {
         setErrors(error.response.data.errors);
       }
+      toast.error(error.response?.data?.message ?? 'Failed to create request');
     },
   });
 
@@ -120,7 +123,7 @@ export function CreateRequest() {
             <CardTitle className="text-base">Request Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="title">Title</Label>
               <Input
                 id="title"
@@ -132,7 +135,7 @@ export function CreateRequest() {
               {errors.title && <p className="text-sm text-red-500 mt-1">{errors.title}</p>}
             </div>
 
-            <div>
+            <div className="space-y-1.5">
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
@@ -146,7 +149,7 @@ export function CreateRequest() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
+              <div className="space-y-1.5">
                 <Label>Department</Label>
                 <Select value={department} onValueChange={v => v && setDepartment(v)}>
                   <SelectTrigger className={errors.department ? 'border-red-500' : ''}>
@@ -161,7 +164,7 @@ export function CreateRequest() {
                 {errors.department && <p className="text-sm text-red-500 mt-1">{errors.department}</p>}
               </div>
 
-              <div>
+              <div className="space-y-1.5">
                 <Label>Urgency</Label>
                 <Select value={urgency} onValueChange={v => v && setUrgency(v)}>
                   <SelectTrigger className={errors.urgency ? 'border-red-500' : ''}>

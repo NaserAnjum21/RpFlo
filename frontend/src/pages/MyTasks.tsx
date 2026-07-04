@@ -9,6 +9,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { StatusBadge, UrgencyBadge } from '@/components/StatusBadge';
+import { RequestListSkeleton } from '@/components/Skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { procurementApi } from '@/api/procurement';
 import { formatRelativeTime } from '@/lib/utils';
@@ -53,7 +54,15 @@ export function MyTasks() {
   const currentPage = data?.page ?? page;
 
   if (isLoading) {
-    return <div className="text-center py-12 text-muted-foreground">Loading...</div>;
+    return (
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">My Tasks</h1>
+          <p className="text-muted-foreground">Loading tasks...</p>
+        </div>
+        <RequestListSkeleton />
+      </div>
+    );
   }
 
   return (
@@ -65,7 +74,7 @@ export function MyTasks() {
         </p>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground whitespace-nowrap">From</span>
           <Input
@@ -97,7 +106,7 @@ export function MyTasks() {
         </Card>
       ) : (
         <>
-          <Card>
+          <Card className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>

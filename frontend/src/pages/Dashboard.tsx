@@ -5,8 +5,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { procurementApi } from '@/api/procurement';
 import {
   FileText, Clock, CheckCircle, XCircle, Package, DollarSign,
-  User, Send, ClipboardList, TrendingUp, Banknote,
+  User, Send, ClipboardList, TrendingUp, Banknote, AlertCircle, RefreshCw,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { UserRole } from '@/types';
 
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 });
@@ -14,14 +15,34 @@ const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2 
 export function Dashboard() {
   const { currentUser } = useAuth();
 
-  const { data: metrics, isLoading } = useQuery({
+  const { data: metrics, isLoading, isError, refetch } = useQuery({
     queryKey: ['metrics', currentUser?.id],
     queryFn: procurementApi.getMetrics,
     enabled: !!currentUser,
   });
 
-  if (isLoading || !metrics) {
+  if (isLoading) {
     return <DashboardSkeleton />;
+  }
+
+  if (isError || !metrics) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        </div>
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="py-6 flex flex-col items-center gap-3 text-center">
+            <AlertCircle className="h-8 w-8 text-red-500" />
+            <p className="text-sm text-red-800">Failed to load dashboard metrics.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
+              <RefreshCw className="h-3 w-3" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   const role = currentUser?.role;

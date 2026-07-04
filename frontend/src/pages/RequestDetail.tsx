@@ -41,6 +41,7 @@ import { DetailSkeleton } from '@/components/Skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { procurementApi } from '@/api/procurement';
 import { formatDate, formatDateTime } from '@/lib/utils';
+import { toast } from 'sonner';
 import type { LineItemResponse } from '@/types';
 
 const departments = ['Engineering', 'Marketing', 'Sales', 'Operations', 'HumanResources', 'Finance'];
@@ -122,60 +123,66 @@ export function RequestDetail() {
   };
 
   const handleMutationError = (error: unknown) => {
-    setActionError(getErrorMessage(error));
+    const msg = getErrorMessage(error);
+    setActionError(msg);
+    toast.error(msg);
   };
 
   const submitMutation = useMutation({
     mutationFn: () => procurementApi.submit(id!),
-    onSuccess: () => { setActionError(''); invalidate(); },
+    onSuccess: () => { setActionError(''); invalidate(); toast.success('Request submitted for approval'); },
     onError: handleMutationError,
   });
 
   const approveManagerMutation = useMutation({
     mutationFn: (comment?: string) => procurementApi.approveByManager(id!, comment),
-    onSuccess: () => { setActionError(''); invalidate(); setApproveDialog(null); },
+    onSuccess: () => { setActionError(''); invalidate(); setApproveDialog(null); toast.success('Request approved'); },
     onError: handleMutationError,
   });
 
   const rejectManagerMutation = useMutation({
     mutationFn: (reason: string) => procurementApi.rejectByManager(id!, reason),
-    onSuccess: () => { setActionError(''); invalidate(); setRejectDialog(null); },
+    onSuccess: () => { setActionError(''); invalidate(); setRejectDialog(null); toast.success('Request rejected'); },
     onError: handleMutationError,
   });
 
   const approveFinanceMutation = useMutation({
     mutationFn: (comment?: string) => procurementApi.approveByFinance(id!, comment),
-    onSuccess: () => { setActionError(''); invalidate(); setApproveDialog(null); },
+    onSuccess: () => { setActionError(''); invalidate(); setApproveDialog(null); toast.success('Finance approval granted'); },
     onError: handleMutationError,
   });
 
   const rejectFinanceMutation = useMutation({
     mutationFn: (reason: string) => procurementApi.rejectByFinance(id!, reason),
-    onSuccess: () => { setActionError(''); invalidate(); setRejectDialog(null); },
+    onSuccess: () => { setActionError(''); invalidate(); setRejectDialog(null); toast.success('Request rejected by finance'); },
     onError: handleMutationError,
   });
 
   const issuePoMutation = useMutation({
     mutationFn: () => procurementApi.issuePo(id!),
-    onSuccess: () => { setActionError(''); invalidate(); },
+    onSuccess: () => { setActionError(''); invalidate(); toast.success('Purchase order issued'); },
     onError: handleMutationError,
   });
 
   const reviseMutation = useMutation({
     mutationFn: () => procurementApi.reviseToDraft(id!),
-    onSuccess: () => { setActionError(''); invalidate(); },
+    onSuccess: () => { setActionError(''); invalidate(); toast.success('Request revised to draft'); },
     onError: handleMutationError,
   });
 
   const commentMutation = useMutation({
     mutationFn: (text: string) => procurementApi.addComment(id!, text),
-    onSuccess: () => { setActionError(''); invalidate(); setCommentText(''); },
+    onSuccess: () => { setActionError(''); invalidate(); setCommentText(''); toast.success('Comment added'); },
     onError: handleMutationError,
   });
 
-  const handleExportPdf = () => {
-    // Use the API client so the simulated auth header is sent with the download request.
-    procurementApi.exportPdf(id!);
+  const handleExportPdf = async () => {
+    try {
+      await procurementApi.exportPdf(id!);
+      toast.success('PDF exported');
+    } catch {
+      toast.error('Failed to export PDF');
+    }
   };
 
   if (isLoading) {
@@ -302,6 +309,7 @@ export function RequestDetail() {
       invalidate();
       setActionError('');
       setIsEditing(false);
+      toast.success('Changes saved');
     } catch (error) {
       handleMutationError(error);
     } finally {

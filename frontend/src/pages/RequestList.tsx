@@ -68,7 +68,7 @@ export function RequestList() {
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground whitespace-nowrap">From</span>
           <Input
@@ -130,7 +130,7 @@ function RequestTable({ requests, isLoading, showRequester }: {
   }
 
   return (
-    <Card>
+    <Card className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>

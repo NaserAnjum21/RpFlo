@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import type { User } from '@/types';
 import { usersApi } from '@/api/users';
 import { setCurrentUser } from '@/api/client';
@@ -24,6 +26,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUserState] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   useEffect(() => {
     usersApi.getAll().then(data => {
@@ -47,6 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setCurrentUserState(user);
       setCurrentUser(user.id);
       localStorage.setItem('currentUserId', user.id);
+      queryClient.clear();
+      navigate('/');
     }
   };
 

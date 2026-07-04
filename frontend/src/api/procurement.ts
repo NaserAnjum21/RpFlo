@@ -10,6 +10,18 @@ import type {
 } from '@/types';
 import api from './client';
 
+function downloadBlob(data: Blob, filename: string, type?: string) {
+  const blob = type ? new Blob([data], { type }) : new Blob([data]);
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 export const procurementApi = {
   getAll: (params: ProcurementListPageParams) =>
     api.get<PagedResult<ProcurementListItem>>('/procurement', { params }).then(r => r.data),
@@ -64,25 +76,11 @@ export const procurementApi = {
 
   exportCsv: () =>
     api.get('/export/csv', { responseType: 'blob' }).then(r => {
-      const url = window.URL.createObjectURL(new Blob([r.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'procurement-requests.csv');
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      downloadBlob(r.data, 'procurement-requests.csv');
     }),
 
   exportPdf: (id: string) =>
     api.get(`/procurement/${id}/export/pdf`, { responseType: 'blob' }).then(r => {
-      const url = window.URL.createObjectURL(new Blob([r.data], { type: 'application/pdf' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `purchase-order-${id}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      downloadBlob(r.data, `purchase-order-${id}.pdf`, 'application/pdf');
     }),
 };
