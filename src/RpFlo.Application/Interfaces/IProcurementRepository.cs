@@ -8,8 +8,9 @@ public interface IProcurementRepository
 {
     Task<ProcurementRequest?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<IReadOnlyList<ProcurementRequest>> GetAllAsync(CancellationToken ct = default);
-    Task<IReadOnlyList<ProcurementRequest>> GetByRequesterIdAsync(Guid requesterId, CancellationToken ct = default);
-    Task<IReadOnlyList<ProcurementRequest>> GetByStatusAsync(ProcurementStatus status, CancellationToken ct = default);
+    Task<PagedResult<ProcurementRequest>> GetPagedAsync(ProcurementListPageQuery query, CancellationToken ct = default);
+    Task<PagedResult<ProcurementRequest>> GetPagedByRequesterIdAsync(Guid requesterId, ProcurementListPageQuery query, CancellationToken ct = default);
+    Task<PagedResult<ProcurementRequest>> GetPagedPendingForUserAsync(Guid userId, UserRole role, ProcurementTaskPageQuery query, CancellationToken ct = default);
     Task<IReadOnlyList<ProcurementRequest>> GetByDepartmentAsync(Department department, CancellationToken ct = default);
     Task<ProcurementRequest> AddAsync(ProcurementRequest request, CancellationToken ct = default);
     Task UpdateAsync(ProcurementRequest request, CancellationToken ct = default);

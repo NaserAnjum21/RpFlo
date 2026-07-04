@@ -23,23 +23,59 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
             .OrderByDescending(p => p.CreatedAt)
             .ToListAsync(ct);
 
-    public async Task<IReadOnlyList<ProcurementRequest>> GetByRequesterIdAsync(
-        Guid requesterId, CancellationToken ct = default) =>
-        await db.ProcurementRequests
-            .Include(p => p.LineItems)
-            .Include(p => p.AuditEntries)
-            .Where(p => p.RequesterId == requesterId)
-            .OrderByDescending(p => p.CreatedAt)
-            .ToListAsync(ct);
+    public async Task<PagedResult<ProcurementRequest>> GetPagedAsync(
+        ProcurementListPageQuery query, CancellationToken ct = default) =>
+        await ToPagedResultAsync(
+            ApplyListFilters(db.ProcurementRequests.AsNoTracking(), query),
+            query.Page,
+            query.PageSize,
+            q => q.OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Id),
+            ct);
 
-    public async Task<IReadOnlyList<ProcurementRequest>> GetByStatusAsync(
-        ProcurementStatus status, CancellationToken ct = default) =>
-        await db.ProcurementRequests
-            .Include(p => p.LineItems)
-            .Include(p => p.AuditEntries)
-            .Where(p => p.Status == status)
-            .OrderByDescending(p => p.CreatedAt)
-            .ToListAsync(ct);
+    public async Task<PagedResult<ProcurementRequest>> GetPagedByRequesterIdAsync(
+        Guid requesterId, ProcurementListPageQuery query, CancellationToken ct = default) =>
+        await ToPagedResultAsync(
+            ApplyListFilters(db.ProcurementRequests.AsNoTracking().Where(p => p.RequesterId == requesterId), query),
+            query.Page,
+            query.PageSize,
+            q => q.OrderByDescending(p => p.CreatedAt).ThenBy(p => p.Id),
+            ct);
+
+    public async Task<PagedResult<ProcurementRequest>> GetPagedPendingForUserAsync(
+        Guid userId, UserRole role, ProcurementTaskPageQuery query, CancellationToken ct = default)
+    {
+        var procurements = db.ProcurementRequests.AsNoTracking();
+
+        var filtered = role switch
+        {
+            UserRole.Requester => procurements.Where(p =>
+                p.RequesterId == userId &&
+                (p.Status == ProcurementStatus.Draft ||
+                 p.Status == ProcurementStatus.ManagerRejected ||
+                 p.Status == ProcurementStatus.FinanceRejected)),
+            UserRole.Manager => procurements.Where(p => p.Status == ProcurementStatus.Submitted),
+            UserRole.Finance => procurements.Where(p =>
+                p.Status == ProcurementStatus.ManagerApproved ||
+                p.Status == ProcurementStatus.FinanceApproved),
+            UserRole.Admin => procurements.Where(p =>
+                p.Status == ProcurementStatus.Submitted ||
+                p.Status == ProcurementStatus.ManagerApproved ||
+                p.Status == ProcurementStatus.FinanceApproved),
+            _ => procurements.Where(_ => false)
+        };
+
+        return await ToPagedResultAsync(
+            ApplyDateFilters(filtered, query.DateFrom, query.DateTo),
+            query.Page,
+            query.PageSize,
+            q => q.OrderBy(p =>
+                    p.Urgency == Urgency.Critical ? 0 :
+                    p.Urgency == Urgency.High ? 1 :
+                    p.Urgency == Urgency.Medium ? 2 : 3)
+                .ThenBy(p => p.CreatedAt)
+                .ThenBy(p => p.Id),
+            ct);
+    }
 
     public async Task<IReadOnlyList<ProcurementRequest>> GetByDepartmentAsync(
         Department department, CancellationToken ct = default) =>
@@ -214,5 +250,68 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
             MonthlySpendApproved: monthlySpend,
             MyStatusBreakdown: myStatusCounts,
             MyDepartmentBreakdown: myDeptCounts);
+    }
+
+    private static IQueryable<ProcurementRequest> ApplyListFilters(
+        IQueryable<ProcurementRequest> query,
+        ProcurementListPageQuery pageQuery)
+    {
+        ProcurementStatus[] statuses = pageQuery.Filter switch
+        {
+            ProcurementListFilter.Draft => [ProcurementStatus.Draft],
+            ProcurementListFilter.Pending => [ProcurementStatus.Submitted, ProcurementStatus.ManagerApproved],
+            ProcurementListFilter.Completed => [ProcurementStatus.PurchaseOrderIssued],
+            ProcurementListFilter.Rejected => [ProcurementStatus.ManagerRejected, ProcurementStatus.FinanceRejected],
+            _ => Array.Empty<ProcurementStatus>()
+        };
+
+        if (statuses.Length > 0)
+            query = query.Where(p => statuses.Contains(p.Status));
+
+        return ApplyDateFilters(query, pageQuery.DateFrom, pageQuery.DateTo);
+    }
+
+    private static IQueryable<ProcurementRequest> ApplyDateFilters(
+        IQueryable<ProcurementRequest> query,
+        DateOnly? dateFrom,
+        DateOnly? dateTo)
+    {
+        if (dateFrom.HasValue)
+        {
+            var from = ToUtcStart(dateFrom.Value);
+            query = query.Where(p => p.CreatedAt >= from);
+        }
+
+        if (dateTo.HasValue)
+        {
+            var toExclusive = ToUtcStart(dateTo.Value.AddDays(1));
+            query = query.Where(p => p.CreatedAt < toExclusive);
+        }
+
+        return query;
+    }
+
+    private static DateTimeOffset ToUtcStart(DateOnly date) =>
+        new(date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc), TimeSpan.Zero);
+
+    private static async Task<PagedResult<ProcurementRequest>> ToPagedResultAsync(
+        IQueryable<ProcurementRequest> query,
+        int requestedPage,
+        int requestedPageSize,
+        Func<IQueryable<ProcurementRequest>, IOrderedQueryable<ProcurementRequest>> orderBy,
+        CancellationToken ct)
+    {
+        var pageSize = Math.Clamp(requestedPageSize, 1, 100);
+        var totalItems = await query.CountAsync(ct);
+        var totalPages = Math.Max(1, (int)Math.Ceiling(totalItems / (double)pageSize));
+        var page = Math.Clamp(requestedPage, 1, totalPages);
+
+        var items = await orderBy(query)
+            .Include(p => p.LineItems)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return new PagedResult<ProcurementRequest>(items, page, pageSize, totalItems, totalPages);
     }
 }

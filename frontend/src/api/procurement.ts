@@ -4,21 +4,24 @@ import type {
   CreateProcurementRequest,
   DashboardMetrics,
   CommentResponse,
+  PagedResult,
+  ProcurementListPageParams,
+  ProcurementTaskPageParams,
 } from '@/types';
 import api from './client';
 
 export const procurementApi = {
-  getAll: () =>
-    api.get<ProcurementListItem[]>('/procurement').then(r => r.data),
+  getAll: (params: ProcurementListPageParams) =>
+    api.get<PagedResult<ProcurementListItem>>('/procurement', { params }).then(r => r.data),
 
   getById: (id: string) =>
     api.get<ProcurementResponse>(`/procurement/${id}`).then(r => r.data),
 
-  getMy: () =>
-    api.get<ProcurementListItem[]>('/procurement/my').then(r => r.data),
+  getMy: (params: ProcurementListPageParams) =>
+    api.get<PagedResult<ProcurementListItem>>('/procurement/my', { params }).then(r => r.data),
 
-  getPending: () =>
-    api.get<ProcurementListItem[]>('/procurement/pending').then(r => r.data),
+  getPending: (params: ProcurementTaskPageParams) =>
+    api.get<PagedResult<ProcurementListItem>>('/procurement/pending', { params }).then(r => r.data),
 
   create: (data: CreateProcurementRequest) =>
     api.post<ProcurementResponse>('/procurement', data).then(r => r.data),

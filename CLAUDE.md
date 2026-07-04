@@ -68,6 +68,7 @@ React 19 + Vite + Tailwind CSS v4 + shadcn/ui (base-ui). TanStack Query for data
 - Vite proxies `/api` to `http://localhost:5000` in dev
 - Import alias: `@/*` → `./src/*`
 - Linter: oxlint (not eslint)
+- Procurement list endpoints (`/api/procurement`, `/api/procurement/my`, `/api/procurement/pending`) return paged results with server-side filtering and pagination.
 
 ## Style Preferences (from Preferences.md)
 

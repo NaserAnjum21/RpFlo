@@ -83,8 +83,47 @@ public class ApiIntegrationTests : IAsyncLifetime
         var response = await _client.GetAsync("/api/procurement");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var items = await response.Content.ReadFromJsonAsync<List<ProcurementListItem>>();
-        items.Should().NotBeEmpty();
+        var page = await response.Content.ReadFromJsonAsync<PagedResult<ProcurementListItem>>();
+        page.Should().NotBeNull();
+        page!.Items.Should().NotBeEmpty();
+        page.Page.Should().Be(1);
+        page.PageSize.Should().Be(10);
+        page.TotalItems.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task GetPagedProcurements_ShouldReturnFilteredPageMetadata()
+    {
+        var response = await _client.GetAsync("/api/procurement?page=2&pageSize=5&filter=pending");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var page = await response.Content.ReadFromJsonAsync<PagedResult<ProcurementListItem>>();
+        page.Should().NotBeNull();
+        page!.Page.Should().Be(2);
+        page.PageSize.Should().Be(5);
+        page.TotalItems.Should().Be(6);
+        page.TotalPages.Should().Be(2);
+        page.Items.Should().HaveCount(1);
+        page.Items.Should().OnlyContain(item => item.Status == "Submitted" || item.Status == "ManagerApproved");
+    }
+
+    [Fact]
+    public async Task GetPagedPendingProcurements_ShouldReturnRoleScopedPageMetadata()
+    {
+        SetUser(ManagerId);
+
+        var response = await _client.GetAsync("/api/procurement/pending?page=1&pageSize=2");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var page = await response.Content.ReadFromJsonAsync<PagedResult<ProcurementListItem>>();
+        page.Should().NotBeNull();
+        page!.Page.Should().Be(1);
+        page.PageSize.Should().Be(2);
+        page.TotalItems.Should().Be(3);
+        page.TotalPages.Should().Be(2);
+        page.Items.Should().HaveCount(2);
+        page.Items.Should().OnlyContain(item => item.Status == "Submitted");
+        page.Items[0].Urgency.Should().Be("Critical");
     }
 
     [Fact]

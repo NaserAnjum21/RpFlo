@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -32,34 +32,25 @@ export function MyTasks() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ['procurement', 'pending', currentUser?.id],
-    queryFn: procurementApi.getPending,
+  const queryParams = {
+    page,
+    pageSize: PAGE_SIZE,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+  };
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['procurement', 'pending', currentUser?.id, page, dateFrom, dateTo],
+    queryFn: () => procurementApi.getPending(queryParams),
     enabled: !!currentUser,
+    placeholderData: keepPreviousData,
   });
 
   const resetPage = () => setPage(1);
-
-  const dateFiltered = tasks.filter(r => {
-    if (dateFrom && new Date(r.createdAt) < new Date(dateFrom)) return false;
-    if (dateTo) {
-      const to = new Date(dateTo);
-      to.setDate(to.getDate() + 1);
-      if (new Date(r.createdAt) >= to) return false;
-    }
-    return true;
-  });
-
-  const sorted = [...dateFiltered].sort((a, b) => {
-    const urgencyOrder: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 };
-    const ua = urgencyOrder[a.urgency] ?? 4;
-    const ub = urgencyOrder[b.urgency] ?? 4;
-    if (ua !== ub) return ua - ub;
-    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-  });
-
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-  const paginated = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const tasks = data?.items ?? [];
+  const total = data?.totalItems ?? 0;
+  const totalPages = data?.totalPages ?? 1;
+  const currentPage = data?.page ?? page;
 
   if (isLoading) {
     return <div className="text-center py-12 text-muted-foreground">Loading...</div>;
@@ -70,7 +61,7 @@ export function MyTasks() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">My Tasks</h1>
         <p className="text-muted-foreground">
-          {getTaskDescription(currentUser?.role)} · {sorted.length} item{sorted.length !== 1 ? 's' : ''}
+          {getTaskDescription(currentUser?.role)} · {total} item{total !== 1 ? 's' : ''}
         </p>
       </div>
 
@@ -100,7 +91,7 @@ export function MyTasks() {
         )}
       </div>
 
-      {sorted.length === 0 ? (
+      {total === 0 ? (
         <Card className="p-8 text-center text-muted-foreground">
           Nothing requires your attention right now.
         </Card>
@@ -120,7 +111,7 @@ export function MyTasks() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {paginated.map((task: ProcurementListItem) => (
+                {tasks.map((task: ProcurementListItem) => (
                   <TableRow key={task.id}>
                     <TableCell>
                       <Link to={`/requests/${task.id}`} className="font-medium text-primary hover:underline">
@@ -142,17 +133,17 @@ export function MyTasks() {
               </TableBody>
             </Table>
           </Card>
-          {sorted.length > PAGE_SIZE && (
+          {total > PAGE_SIZE && (
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sorted.length)} of {sorted.length}
+                {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, total)} of {total}
               </p>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-8 w-8" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="text-sm px-2">{page} / {totalPages}</span>
-                <Button variant="outline" size="icon" className="h-8 w-8" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+                <span className="text-sm px-2">{currentPage} / {totalPages}</span>
+                <Button variant="outline" size="icon" className="h-8 w-8" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>

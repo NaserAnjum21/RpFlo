@@ -13,12 +13,19 @@ import { StatusBadge, UrgencyBadge } from '@/components/StatusBadge';
 import { procurementApi } from '@/api/procurement';
 import { formatDate } from '@/lib/utils';
 
+const APPROVALS_PAGE_SIZE = 100;
+
 export function Approvals({ role }: { role: 'Manager' | 'Finance' }) {
-  const { data: pending = [], isLoading } = useQuery({
-    queryKey: ['procurement', 'all'],
-    queryFn: procurementApi.getAll,
+  const { data, isLoading } = useQuery({
+    queryKey: ['procurement', 'approvals', role],
+    queryFn: () => procurementApi.getAll({
+      page: 1,
+      pageSize: APPROVALS_PAGE_SIZE,
+      filter: 'pending',
+    }),
   });
 
+  const pending = data?.items ?? [];
   const filteredPending = pending.filter(r =>
     role === 'Manager' ? r.status === 'Submitted' : r.status === 'ManagerApproved'
   );

@@ -30,6 +30,31 @@ export interface ProcurementListItem {
   updatedAt: string;
 }
 
+export interface PagedResult<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+export type ProcurementListFilter = 'all' | 'draft' | 'pending' | 'completed' | 'rejected';
+
+export interface ProcurementListPageParams {
+  page: number;
+  pageSize: number;
+  filter: ProcurementListFilter;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface ProcurementTaskPageParams {
+  page: number;
+  pageSize: number;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
 export interface ProcurementResponse {
   id: string;
   title: string;

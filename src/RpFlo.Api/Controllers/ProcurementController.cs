@@ -19,23 +19,28 @@ public sealed class ProcurementController(
     IValidator<AddCommentRequest> commentValidator) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ProcurementListItem>>> GetAll(CancellationToken ct) =>
-        Ok(await service.GetAllAsync(ct));
+    public async Task<ActionResult<PagedResult<ProcurementListItem>>> GetAll(
+        [FromQuery] ProcurementListPageQuery query,
+        CancellationToken ct) =>
+        Ok(await service.GetPagedAsync(query, ct));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ProcurementResponse>> GetById(Guid id, CancellationToken ct) =>
         ToActionResult(await service.GetByIdAsync(id, ct));
 
     [HttpGet("my")]
-    public async Task<ActionResult<IReadOnlyList<ProcurementListItem>>> GetMy(
-        [FromHeader(Name = "X-User-Id")] Guid userId, CancellationToken ct) =>
-        Ok(await service.GetByRequesterAsync(userId, ct));
+    public async Task<ActionResult<PagedResult<ProcurementListItem>>> GetMy(
+        [FromHeader(Name = "X-User-Id")] Guid userId,
+        [FromQuery] ProcurementListPageQuery query,
+        CancellationToken ct) =>
+        Ok(await service.GetPagedByRequesterAsync(userId, query, ct));
 
     [HttpGet("pending")]
-    public async Task<ActionResult<IReadOnlyList<ProcurementListItem>>> GetPending(
+    public async Task<ActionResult<PagedResult<ProcurementListItem>>> GetPending(
         [FromHeader(Name = "X-User-Id")] Guid userId,
+        [FromQuery] ProcurementTaskPageQuery query,
         CancellationToken ct) =>
-        ToActionResult(await service.GetPendingForUserAsync(userId, ct));
+        ToActionResult(await service.GetPagedPendingForUserAsync(userId, query, ct));
 
     [HttpPost]
     public async Task<ActionResult<ProcurementResponse>> Create(

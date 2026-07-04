@@ -4,6 +4,23 @@ Record of key architectural and trade-off decisions for RpFlo. Newest entries fi
 
 ---
 
+## ADR-006: Server-Side Pagination for Request Queues
+
+**Date:** 2026-07-04
+**Status:** Accepted
+
+**Context:** Requests and My Tasks pages were fetching full request queues, then filtering and paginating in React. That worked for seed data but would over-fetch and produce inaccurate page boundaries as data grows.
+
+**Decision:** Make procurement list API endpoints return paged results for request lists and actionable task queues. Server-side queries apply date/status/task filters, count matching rows, sort deterministically, and then page with SQL `Skip`/`Take`. Export uses a separate internal full-list service path because it needs the complete dataset.
+
+**Trade-offs:**
+- (+) Page changes fetch only the rows needed for the current view
+- (+) Counts and pagination controls reflect the filtered server result set
+- (+) Public list routes have one response shape instead of parallel paged and unpaged variants
+- (-) Existing list consumers must read the paged envelope instead of a raw array
+
+---
+
 ## ADR-001: Clean Architecture with Railway-Oriented Programming
 
 **Date:** 2026-07-03

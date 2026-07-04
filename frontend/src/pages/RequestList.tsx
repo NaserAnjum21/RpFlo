@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -14,52 +14,40 @@ import { RequestListSkeleton } from '@/components/Skeleton';
 import { useAuth } from '@/hooks/useAuth';
 import { procurementApi } from '@/api/procurement';
 import { formatDate } from '@/lib/utils';
-import type { ProcurementListItem } from '@/types';
+import type { ProcurementListFilter, ProcurementListItem } from '@/types';
 
 const PAGE_SIZE = 10;
 
 export function RequestList() {
   const { currentUser } = useAuth();
   const isRequester = currentUser?.role === 'Requester';
-  const [tab, setTab] = useState('all');
+  const [tab, setTab] = useState<ProcurementListFilter>('all');
   const [page, setPage] = useState(1);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const { data: rawRequests = [], isLoading } = useQuery({
-    queryKey: ['procurement', isRequester ? 'my' : 'all'],
-    queryFn: isRequester ? procurementApi.getMy : procurementApi.getAll,
+  const queryParams = {
+    page,
+    pageSize: PAGE_SIZE,
+    filter: tab,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+  };
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['procurement', isRequester ? 'my' : 'all', currentUser?.id, page, tab, dateFrom, dateTo],
+    queryFn: () => isRequester
+      ? procurementApi.getMy(queryParams)
+      : procurementApi.getAll(queryParams),
+    enabled: !!currentUser,
+    placeholderData: keepPreviousData,
   });
 
   const resetPage = () => setPage(1);
-
-  const dateFiltered = rawRequests.filter(r => {
-    if (dateFrom && new Date(r.createdAt) < new Date(dateFrom)) return false;
-    if (dateTo) {
-      const to = new Date(dateTo);
-      to.setDate(to.getDate() + 1);
-      if (new Date(r.createdAt) >= to) return false;
-    }
-    return true;
-  });
-
-  const tabFiltered = (() => {
-    switch (tab) {
-      case 'draft':
-        return dateFiltered.filter(r => r.status === 'Draft');
-      case 'pending':
-        return dateFiltered.filter(r => r.status === 'Submitted' || r.status === 'ManagerApproved');
-      case 'completed':
-        return dateFiltered.filter(r => r.status === 'PurchaseOrderIssued');
-      case 'rejected':
-        return dateFiltered.filter(r => r.status === 'ManagerRejected' || r.status === 'FinanceRejected');
-      default:
-        return dateFiltered;
-    }
-  })();
-
-  const totalPages = Math.max(1, Math.ceil(tabFiltered.length / PAGE_SIZE));
-  const paginated = tabFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const requests = data?.items ?? [];
+  const total = data?.totalItems ?? 0;
+  const totalPages = data?.totalPages ?? 1;
+  const currentPage = data?.page ?? page;
 
   return (
     <div className="space-y-4">
@@ -68,7 +56,7 @@ export function RequestList() {
           <h1 className="text-2xl font-bold tracking-tight">
             {isRequester ? 'My Requests' : 'Procurement Requests'}
           </h1>
-          <p className="text-muted-foreground">{rawRequests.length} total requests</p>
+          <p className="text-muted-foreground">{total} total requests</p>
         </div>
         {(isRequester || currentUser?.role === 'Admin') && (
           <Link to="/requests/new">
@@ -106,7 +94,7 @@ export function RequestList() {
         )}
       </div>
 
-      <Tabs value={tab} onValueChange={v => { setTab(v); resetPage(); }}>
+      <Tabs value={tab} onValueChange={v => { setTab(v as ProcurementListFilter); resetPage(); }}>
         <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="draft">Drafts</TabsTrigger>
@@ -116,9 +104,9 @@ export function RequestList() {
         </TabsList>
 
         <TabsContent value={tab} className="mt-4">
-          <RequestTable requests={paginated} isLoading={isLoading} showRequester={!isRequester} />
-          {tabFiltered.length > PAGE_SIZE && (
-            <Pagination page={page} totalPages={totalPages} onPageChange={setPage} total={tabFiltered.length} />
+          <RequestTable requests={requests} isLoading={isLoading} showRequester={!isRequester} />
+          {total > PAGE_SIZE && (
+            <Pagination page={currentPage} totalPages={totalPages} onPageChange={setPage} total={total} />
           )}
         </TabsContent>
       </Tabs>
