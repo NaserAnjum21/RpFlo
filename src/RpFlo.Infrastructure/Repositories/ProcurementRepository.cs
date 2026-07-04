@@ -117,9 +117,8 @@ public sealed class ProcurementRepository(AppDbContext db) : IProcurementReposit
 
         var avgHours = await db.ProcurementRequests
             .Where(p => p.Status == ProcurementStatus.PurchaseOrderIssued)
-            .Select(p => EF.Functions.DateDiffSecond(p.CreatedAt, p.UpdatedAt))
-            .DefaultIfEmpty(0)
-            .AverageAsync(ct);
+            .Select(p => (double?)EF.Functions.DateDiffSecond(p.CreatedAt, p.UpdatedAt))
+            .AverageAsync(ct) ?? 0;
 
         return new DashboardMetrics(
             TotalRequests: total,
